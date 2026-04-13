@@ -1,4 +1,4 @@
 # Rocky
-## EXPERIMANTAL/LEARNING REPO ##
+### EXPERIMANTAL/LEARNING REPO ###
 Analyze stock pick anywhere anytime
 
