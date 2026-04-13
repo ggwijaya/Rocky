@@ -5,7 +5,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-st.set_page_config(page_title="SIGNAL — Stock Intelligence", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Rocky Signal — Stock Intelligence", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
@@ -69,7 +69,26 @@ def signal_tag(label, direction):
 
 @st.cache_data(ttl=300)
 def fetch_data(ticker, period):
-    t = yf.Ticker(ticker); return t.history(period=period, interval="1d"), t.info
+    t = yf.Ticker(ticker)
+    hist = pd.DataFrame()
+    try:
+        hist = t.history(period=period, interval="1d")
+    except Exception:
+        pass
+    if hist.empty:
+        try:
+            hist = yf.download(ticker, period=period, interval="1d", progress=False, auto_adjust=True)
+            if not hist.empty and isinstance(hist.columns, pd.MultiIndex):
+                hist.columns = hist.columns.droplevel(1)
+        except Exception:
+            pass
+    try:
+        info = t.info
+        if not isinstance(info, dict) or len(info) <= 1:
+            info = {}
+    except Exception:
+        info = {}
+    return hist, info
 
 def build_chart(df):
     fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.55,0.25,0.20], vertical_spacing=0.03)
@@ -128,7 +147,7 @@ def generate_verdict(score, df):
     return {"action":action,"color":color,"bias":bias,"score":score,"stop":stop,"target":target,"atr":atr,"rr":rr}
 
 # ── UI ──
-st.markdown("<div style='margin-bottom:8px'><span style='font-family:Bebas Neue,sans-serif;font-size:38px;letter-spacing:0.15em;color:#fff'>SIGNAL</span><span style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#333;margin-left:12px;letter-spacing:0.2em'>STOCK INTELLIGENCE TERMINAL</span></div><div style='height:2px;background:linear-gradient(90deg,#00f5d4,transparent);width:200px;margin-bottom:28px'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom:12px'><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#00f5d4;text-shadow:0 0 40px rgba(0,245,212,0.45)'>ROCKY</span><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#fff;margin-left:14px'>SIGNAL</span><br><span style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#444;letter-spacing:0.25em'>STOCK INTELLIGENCE TERMINAL</span></div><div style='height:2px;background:linear-gradient(90deg,#00f5d4,transparent);width:320px;margin-bottom:32px'></div>", unsafe_allow_html=True)
 
 col_in, col_period, col_btn = st.columns([3, 1.5, 1])
 with col_in: ticker_input = st.text_input("", placeholder="TICKER — e.g. BBCA.JK, ^JKSE, AAPL, BTC-USD", label_visibility="collapsed")
@@ -152,7 +171,7 @@ if analyze_btn and ticker_input:
     ticker = ticker_input.strip().upper()
     with st.spinner(f"Fetching {ticker}..."):
         try: hist, info = fetch_data(ticker, period)
-        except: st.error(f"Could not fetch {ticker}. Check the ticker."); st.stop()
+        except Exception as e: st.error(f"Could not fetch {ticker}. Check the ticker. ({e})"); st.stop()
     if hist.empty or len(hist) < 10: st.error("No data. Check ticker symbol."); st.stop()
 
     hist = compute_indicators(hist)
@@ -217,7 +236,7 @@ if analyze_btn and ticker_input:
         with st.expander("🏢 COMPANY OVERVIEW"):
             st.markdown(f'<div style="font-size:12px;color:#aaa;line-height:1.8">{info["longBusinessSummary"]}</div>', unsafe_allow_html=True)
 
-    st.markdown('<br><div style="font-size:10px;color:#222;text-align:center">SIGNAL TERMINAL — DATA VIA YAHOO FINANCE — NOT FINANCIAL ADVICE</div>', unsafe_allow_html=True)
+    st.markdown('<br><div style="font-size:10px;color:#222;text-align:center">ROCKY SIGNAL TERMINAL — DATA VIA YAHOO FINANCE — NOT FINANCIAL ADVICE</div>', unsafe_allow_html=True)
 
 elif not ticker_input:
     st.markdown("<div style='text-align:center;padding:60px 0'><div style='font-size:52px;margin-bottom:16px'>📡</div><div style='font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:0.2em;color:#1e1e30'>AWAITING TICKER INPUT</div><div style='font-size:11px;color:#151520;margin-top:10px'>AAPL · TSLA · NVDA · BTC-USD · ^JKSE · BBCA.JK · TLKM.JK</div></div>", unsafe_allow_html=True)
