@@ -25,6 +25,22 @@ div[data-testid="stMetricLabel"] { font-size: 11px !important; letter-spacing: 0
 .stButton>button { background: #00f5d4 !important; color: #080810 !important; border: none !important; font-family: 'Bebas Neue', sans-serif !important; font-size: 16px !important; letter-spacing: 0.15em !important; border-radius: 8px !important; padding: 10px 28px !important; }
 .stTextInput>div>div>input { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.12) !important; border-radius: 8px !important; color: #fff !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 15px !important; letter-spacing: 0.1em !important; }
 footer { visibility: hidden; } #MainMenu { visibility: hidden; }
+/* ── MOBILE RESPONSIVE ── */
+@media (max-width: 768px) {
+    .block-container { max-width: 100% !important; padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
+    .rocky-hero { text-align: center !important; }
+    .rocky-hero span { font-size: 44px !important; }
+    .rocky-divider { width: 180px !important; margin: 0 auto 24px !important; }
+    [data-testid="stMetric"] { text-align: center !important; }
+    [data-testid="stMetricValue"] { text-align: center !important; }
+    [data-testid="stMetricLabel"] { text-align: center !important; }
+    [data-testid="stMetricDelta"] { justify-content: center !important; }
+    .section-header { text-align: center !important; }
+    div[data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] { min-width: 45% !important; flex: 1 1 45% !important; }
+    .verdict-box { padding: 14px 16px !important; }
+    .js-plotly-plot, .plotly-graph-div { touch-action: pan-y !important; }
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -147,7 +163,7 @@ def generate_verdict(score, df):
     return {"action":action,"color":color,"bias":bias,"score":score,"stop":stop,"target":target,"atr":atr,"rr":rr}
 
 # ── UI ──
-st.markdown("<div style='margin-bottom:12px'><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#00f5d4;text-shadow:0 0 40px rgba(0,245,212,0.45)'>ROCKY</span><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#fff;margin-left:14px'>SIGNAL</span><br><span style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#444;letter-spacing:0.25em'>STOCK INTELLIGENCE TERMINAL</span></div><div style='height:2px;background:linear-gradient(90deg,#00f5d4,transparent);width:320px;margin-bottom:32px'></div>", unsafe_allow_html=True)
+st.markdown("<div class='rocky-hero' style='margin-bottom:12px'><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#00f5d4;text-shadow:0 0 40px rgba(0,245,212,0.45)'>ROCKY</span><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#fff;margin-left:14px'>SIGNAL</span><br><span style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#444;letter-spacing:0.25em'>STOCK INTELLIGENCE TERMINAL</span></div><div class='rocky-divider' style='height:2px;background:linear-gradient(90deg,#00f5d4,transparent);width:320px;margin-bottom:32px'></div>", unsafe_allow_html=True)
 
 col_in, col_period, col_btn = st.columns([3, 1.5, 1])
 with col_in: ticker_input = st.text_input("", placeholder="TICKER — e.g. BBCA.JK, ^JKSE, AAPL, BTC-USD", label_visibility="collapsed")
@@ -208,7 +224,7 @@ if analyze_btn and ticker_input:
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="section-header">📈 PRICE CHART + INDICATORS</div>', unsafe_allow_html=True)
-    st.plotly_chart(build_chart(hist), use_container_width=True)
+    st.plotly_chart(build_chart(hist), use_container_width=True, config={"scrollZoom": False})
 
     ct, cf = st.columns(2, gap="large")
     with ct:
@@ -218,11 +234,11 @@ if analyze_btn and ticker_input:
         st.markdown("<br>", unsafe_allow_html=True)
         rsi_val = last["RSI"]
         rows = [("PRICE",p(price),"—"),("EMA 20",p(last["EMA_20"]),"↑ Bull" if price>last["EMA_20"] else "↓ Bear"),("EMA 50",p(last["EMA_50"]),"↑ Bull" if price>last["EMA_50"] else "↓ Bear"),("EMA 200",p(last["EMA_200"]),"↑ Bull" if price>last["EMA_200"] else "↓ Bear"),("RSI 14",fmt(rsi_val,1),"OB" if rsi_val>70 else ("OS" if rsi_val<30 else "Neutral")),("ATR 14",p(last["ATR"]),"Volatility"),("MACD",fmt(last["MACD"],2),"↑ Bull" if last["MACD"]>last["MACD_Signal"] else "↓ Bear")]
-        st.dataframe(pd.DataFrame(rows, columns=["Indicator","Value","Signal"]), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows, columns=["Indicator","Value","Signal"]), use_container_width=True, hide_index=True, height=285)
     with cf:
         st.markdown('<div class="section-header">🏦 FUNDAMENTALS</div>', unsafe_allow_html=True)
         fund_rows = [("P/E RATIO",fmt(info.get("trailingPE"),2)),("FWD P/E",fmt(info.get("forwardPE"),2)),("PEG RATIO",fmt(info.get("pegRatio"),2)),("P/S RATIO",fmt(info.get("priceToSalesTrailing12Months"),2)),("P/B RATIO",fmt(info.get("priceToBook"),2)),("EPS (TTM)",p(info.get("trailingEps"))),("FWD EPS",p(info.get("forwardEps"))),("REV GROWTH",pct(info.get("revenueGrowth"))),("PROFIT MARGIN",pct(info.get("profitMargins"))),("DEBT/EQUITY",fmt(info.get("debtToEquity"),2)),("DIVIDEND %",pct(info.get("dividendYield"))),("SHORT FLOAT",pct(info.get("shortPercentOfFloat")))]
-        st.dataframe(pd.DataFrame(fund_rows, columns=["Metric","Value"]), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(fund_rows, columns=["Metric","Value"]), use_container_width=True, hide_index=True, height=460)
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="section-header">⚡ TRADER\'S VERDICT</div>', unsafe_allow_html=True)
