@@ -390,11 +390,62 @@ st.markdown("""
 
 col_in, col_period, col_btn = st.columns([3, 1.5, 1])
 with col_in:
-    ticker_input = st.text_input("", placeholder="TICKER — e.g. AAPL, TSLA, MSFT, BTC-USD", label_visibility="collapsed")
+    ticker_input = st.text_input("", placeholder="TICKER — e.g. BBCA.JK, ^JKSE, AAPL, BTC-USD", label_visibility="collapsed")
 with col_period:
     period = st.selectbox("", ["1mo", "3mo", "6mo", "1y", "2y"], index=2, label_visibility="collapsed")
 with col_btn:
     analyze_btn = st.button("ANALYZE")
+
+# ── IDX QUICK SELECT ──
+IDX_TICKERS = {
+    "🇮🇩 INDICES": {
+        "IHSG (^JKSE)": "^JKSE",
+        "LQ45 (^JKLQ45)": "^JKLQ45",
+    },
+    "🏦 Banking": {
+        "BBCA": "BBCA.JK", "BBRI": "BBRI.JK",
+        "BMRI": "BMRI.JK", "BBNI": "BBNI.JK",
+    },
+    "⚡ Energy & Mining": {
+        "ADRO": "ADRO.JK", "PTBA": "PTBA.JK",
+        "INCO": "INCO.JK", "MEDC": "MEDC.JK",
+    },
+    "📱 Telco & Tech": {
+        "TLKM": "TLKM.JK", "EXCL": "EXCL.JK",
+        "GOTO": "GOTO.JK", "BUKA": "BUKA.JK",
+    },
+    "🏭 Consumer & Industrial": {
+        "UNVR": "UNVR.JK", "ICBP": "ICBP.JK",
+        "ASII": "ASII.JK", "KLBF": "KLBF.JK",
+    },
+}
+
+with st.expander("🇮🇩  IDX QUICK SELECT — Indonesian Stocks & Indices"):
+    st.markdown("""
+    <div style='font-size:11px;color:#555;margin-bottom:12px;font-family:IBM Plex Mono,monospace'>
+    Indonesian stocks use <b style='color:#f5a623'>.JK</b> suffix &nbsp;|&nbsp;
+    IHSG index = <b style='color:#f5a623'>^JKSE</b> &nbsp;|&nbsp;
+    Type directly in the box above or click a button below
+    </div>
+    """, unsafe_allow_html=True)
+
+    quick_ticker = None
+    for sector, tickers in IDX_TICKERS.items():
+        st.markdown(f"<span style='font-size:11px;color:#444;letter-spacing:0.1em'>{sector}</span>", unsafe_allow_html=True)
+        cols = st.columns(len(tickers))
+        for col, (name, sym) in zip(cols, tickers.items()):
+            if col.button(name, key=f"quick_{sym}"):
+                quick_ticker = sym
+
+    if quick_ticker:
+        ticker_input = quick_ticker
+        analyze_btn = True
+
+    st.markdown("""
+    <div style='font-size:10px;color:#333;margin-top:10px;font-family:IBM Plex Mono,monospace'>
+    Other IDX tickers: just type the stock code + .JK (e.g. ANTM.JK, INDF.JK, PGAS.JK, SMGR.JK)
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("---", unsafe_allow_html=True)
 
@@ -420,13 +471,41 @@ if analyze_btn and ticker_input:
     change = price - prev["Close"]
     change_pct = (change / prev["Close"]) * 100
 
+    # ── CURRENCY DETECTION ──
+    currency = info.get("currency", "USD")
+    is_idr = currency == "IDR" or ticker.endswith(".JK") or ticker in ["^JKSE","^JKLQ45"]
+    ccy_symbol = "Rp " if is_idr else ("$" if currency in ["USD",""] else currency + " ")
+    price_fmt = f"{price:,.0f}" if is_idr else f"{price:,.2f}"
+    change_fmt = f"{abs(change):,.0f}" if is_idr else f"{abs(change):,.2f}"
+
+    def fmt_ccy(val, decimals=None):
+        if val is None or (isinstance(val, float) and pd.isna(val)): return "N/A"
+        d = 0 if is_idr else (decimals if decimals is not None else 2)
+        return f"{ccy_symbol}{val:,.{d}f}"
+
+    def fmt_large_ccy(val):
+        if val is None or pd.isna(val): return "N/A"
+        sym = ccy_symbol
+        if is_idr:
+            if val >= 1e12: return f"{sym}{val/1e12:.2f}T"
+            if val >= 1e9:  return f"{sym}{val/1e9:.2f}M"
+            if val >= 1e6:  return f"{sym}{val/1e6:.2f}Jt"
+            return f"{sym}{val:,.0f}"
+        else:
+            if val >= 1e12: return f"{sym}{val/1e12:.2f}T"
+            if val >= 1e9:  return f"{sym}{val/1e9:.2f}B"
+            if val >= 1e6:  return f"{sym}{val/1e6:.2f}M"
+            return f"{sym}{val:,.0f}"
+
     # ── HEADER ROW ──
+    market_badge = '<span style="background:rgba(255,214,10,0.1);border:1px solid #ffd60a30;border-radius:4px;padding:2px 8px;font-size:10px;color:#ffd60a;letter-spacing:0.1em">IDX · INDONESIA</span>' if is_idr else ""
     st.markdown(f"""
-    <div style='display:flex;align-items:baseline;gap:16px;margin-bottom:20px'>
+    <div style='display:flex;align-items:baseline;gap:16px;margin-bottom:20px;flex-wrap:wrap'>
       <span style='font-family:Bebas Neue,sans-serif;font-size:32px;color:#00f5d4;letter-spacing:0.1em'>{ticker}</span>
-      <span style='font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff'>${price:,.2f}</span>
+      {market_badge}
+      <span style='font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff'>{ccy_symbol}{price_fmt}</span>
       <span style='font-family:IBM Plex Mono,monospace;font-size:14px;color:{"#00f5d4" if change>=0 else "#ff6b6b"}'>
-        {"▲" if change>=0 else "▼"} {abs(change):,.2f} ({abs(change_pct):.2f}%)
+        {"&#9650;" if change>=0 else "&#9660;"} {change_fmt} ({abs(change_pct):.2f}%)
       </span>
       <span style='font-size:11px;color:#333;margin-left:auto'>{info.get("longName","")}</span>
     </div>
@@ -435,9 +514,9 @@ if analyze_btn and ticker_input:
     # ── QUICK STATS ──
     m1, m2, m3, m4, m5 = st.columns(5)
     stats = [
-        ("MKT CAP", fmt_large(info.get("marketCap"))),
-        ("52W HIGH", fmt(info.get("fiftyTwoWeekHigh"), prefix="$")),
-        ("52W LOW",  fmt(info.get("fiftyTwoWeekLow"),  prefix="$")),
+        ("MKT CAP", fmt_large_ccy(info.get("marketCap"))),
+        ("52W HIGH", fmt_ccy(info.get("fiftyTwoWeekHigh"))),
+        ("52W LOW",  fmt_ccy(info.get("fiftyTwoWeekLow"))),
         ("AVG VOL",  fmt_large(info.get("averageVolume"))),
         ("BETA",     fmt(info.get("beta"), decimals=2)),
     ]
@@ -486,8 +565,8 @@ if analyze_btn and ticker_input:
             ("PEG RATIO",     fmt(info.get("pegRatio"), decimals=2)),
             ("P/S RATIO",     fmt(info.get("priceToSalesTrailing12Months"), decimals=2)),
             ("P/B RATIO",     fmt(info.get("priceToBook"), decimals=2)),
-            ("EPS (TTM)",     fmt(info.get("trailingEps"), prefix="$")),
-            ("FWD EPS",       fmt(info.get("forwardEps"), prefix="$")),
+            ("EPS (TTM)",     fmt_ccy(info.get("trailingEps"))),
+            ("FWD EPS",       fmt_ccy(info.get("forwardEps"))),
             ("REV GROWTH",    fmt(info.get("revenueGrowth", 0)*100 if info.get("revenueGrowth") else None, suffix="%")),
             ("PROFIT MARGIN", fmt(info.get("profitMargins", 0)*100 if info.get("profitMargins") else None, suffix="%")),
             ("DEBT/EQUITY",   fmt(info.get("debtToEquity"), decimals=2)),
@@ -505,18 +584,23 @@ if analyze_btn and ticker_input:
     vcol1, vcol2, vcol3, vcol4 = st.columns(4)
     vcol1.metric("ACTION", v["action"])
     vcol2.metric("SIGNAL SCORE", f"{v['score']:+d} / 10")
-    vcol3.metric("STOP LOSS", fmt(v["stop"], prefix="$"))
-    vcol4.metric("TARGET", fmt(v["target"], prefix="$"))
+    vcol3.metric("STOP LOSS", fmt_ccy(v["stop"]))
+    vcol4.metric("TARGET", fmt_ccy(v["target"]))
+
+    atr_fmt = f"{v['atr']:,.0f}" if is_idr else f"{v['atr']:.2f}"
+    entry_fmt = f"{ccy_symbol}{price_fmt}"
+    stop_fmt  = f"{ccy_symbol}{v['stop']:,.0f}" if is_idr else f"{ccy_symbol}{v['stop']:,.2f}"
+    tgt_fmt   = f"{ccy_symbol}{v['target']:,.0f}" if is_idr else f"{ccy_symbol}{v['target']:,.2f}"
 
     st.markdown(f"""
     <div class='verdict-box'>
       <span style='font-family:Bebas Neue,sans-serif;font-size:22px;color:{v["color"]};letter-spacing:0.1em'>{v["action"]}</span>
-      <span style='font-size:12px;color:#666;margin-left:14px'>Signal Score: {v["score"]:+d} &nbsp;|&nbsp; R:R = 1:{v["rr"]} &nbsp;|&nbsp; ATR = ${v["atr"]:.2f}</span>
+      <span style='font-size:12px;color:#666;margin-left:14px'>Signal Score: {v["score"]:+d} &nbsp;|&nbsp; R:R = 1:{v["rr"]} &nbsp;|&nbsp; ATR = {ccy_symbol}{atr_fmt}</span>
       <br><br>
       <span style='font-size:12px;color:#aaa;line-height:1.8'>
-        📍 <b>Entry Zone:</b> ${price:,.2f} (current) &nbsp;&nbsp;
-        🛑 <b>Stop Loss:</b> ${v["stop"]:,.2f} &nbsp;&nbsp;
-        🎯 <b>Target:</b> ${v["target"]:,.2f}
+        &#128205; <b>Entry Zone:</b> {entry_fmt} (current) &nbsp;&nbsp;
+        &#128721; <b>Stop Loss:</b> {stop_fmt} &nbsp;&nbsp;
+        &#127919; <b>Target:</b> {tgt_fmt}
         <br>
         Bias is <b style='color:{v["color"]}'>{v["bias"]}</b> based on {len(signals)} technical signals scanned across EMA trend, RSI momentum, MACD crossover, volume, and Bollinger Bands.
       </span>
@@ -545,7 +629,7 @@ elif not ticker_input and not analyze_btn:
       <div style='font-size:52px;margin-bottom:16px'>📡</div>
       <div style='font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:0.2em;color:#1e1e30'>AWAITING TICKER INPUT</div>
       <div style='font-size:11px;color:#151520;margin-top:10px;letter-spacing:0.08em'>
-        Enter any stock ticker above — AAPL · TSLA · MSFT · NVDA · BTC-USD · ETH-USD
+        Enter any stock ticker above — AAPL · TSLA · NVDA · BTC-USD · ^JKSE · BBCA.JK · TLKM.JK
       </div>
     </div>
     """, unsafe_allow_html=True)
