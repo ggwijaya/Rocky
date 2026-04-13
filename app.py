@@ -31,10 +31,11 @@ footer { visibility: hidden; } #MainMenu { visibility: hidden; }
     .rocky-hero { text-align: center !important; }
     .rocky-hero span { font-size: 44px !important; }
     .rocky-divider { width: 180px !important; margin: 0 auto 24px !important; }
-    [data-testid="stMetric"] { text-align: center !important; }
-    [data-testid="stMetricValue"] { text-align: center !important; }
-    [data-testid="stMetricLabel"] { text-align: center !important; }
+    [data-testid="stMetric"] { text-align: center !important; display: flex !important; flex-direction: column !important; align-items: center !important; }
+    [data-testid="stMetricValue"] { text-align: center !important; width: 100% !important; }
+    [data-testid="stMetricLabel"] { text-align: center !important; width: 100% !important; }
     [data-testid="stMetricDelta"] { justify-content: center !important; }
+    .rocky-hero .hero-subtitle { font-size: 11px !important; letter-spacing: 0.25em !important; }
     .section-header { text-align: center !important; }
     div[data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; }
     div[data-testid="stHorizontalBlock"] > div[data-testid="column"] { min-width: 45% !important; flex: 1 1 45% !important; }
@@ -163,7 +164,7 @@ def generate_verdict(score, df):
     return {"action":action,"color":color,"bias":bias,"score":score,"stop":stop,"target":target,"atr":atr,"rr":rr}
 
 # ── UI ──
-st.markdown("<div class='rocky-hero' style='margin-bottom:12px'><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#00f5d4;text-shadow:0 0 40px rgba(0,245,212,0.45)'>ROCKY</span><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#fff;margin-left:14px'>SIGNAL</span><br><span style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#444;letter-spacing:0.25em'>STOCK INTELLIGENCE TERMINAL</span></div><div class='rocky-divider' style='height:2px;background:linear-gradient(90deg,#00f5d4,transparent);width:320px;margin-bottom:32px'></div>", unsafe_allow_html=True)
+st.markdown("<div class='rocky-hero' style='margin-bottom:12px'><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#00f5d4;text-shadow:0 0 40px rgba(0,245,212,0.45)'>ROCKY</span><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#fff;margin-left:14px'>SIGNAL</span><br><span class='hero-subtitle' style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#444;letter-spacing:0.25em'>STOCK INTELLIGENCE TERMINAL</span></div><div class='rocky-divider' style='height:2px;background:linear-gradient(90deg,#00f5d4,transparent);width:320px;margin-bottom:32px'></div>", unsafe_allow_html=True)
 
 col_in, col_period, col_btn = st.columns([3, 1.5, 1])
 with col_in: ticker_input = st.text_input("", placeholder="TICKER — e.g. BBCA.JK, ^JKSE, AAPL, BTC-USD", label_visibility="collapsed")
@@ -224,7 +225,7 @@ if analyze_btn and ticker_input:
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="section-header">📈 PRICE CHART + INDICATORS</div>', unsafe_allow_html=True)
-    st.plotly_chart(build_chart(hist), use_container_width=True, config={"scrollZoom": False})
+    st.plotly_chart(build_chart(hist), use_container_width=True, config={"scrollZoom": False, "staticPlot": True})
 
     ct, cf = st.columns(2, gap="large")
     with ct:
