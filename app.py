@@ -89,6 +89,8 @@ def fetch_data(ticker, period):
     hist = pd.DataFrame()
     try:
         hist = t.history(period=period, interval="1d")
+        if not hist.empty and isinstance(hist.columns, pd.MultiIndex):
+            hist.columns = hist.columns.droplevel(1)
     except Exception:
         pass
     if hist.empty:
