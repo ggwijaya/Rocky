@@ -1,2 +1,2 @@
 # StoAn
-Analyze your stock pick anywhere anytime
+Analyze stock pick anywhere anytime
