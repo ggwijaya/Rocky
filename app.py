@@ -69,7 +69,26 @@ def signal_tag(label, direction):
 
 @st.cache_data(ttl=300)
 def fetch_data(ticker, period):
-    t = yf.Ticker(ticker); return t.history(period=period, interval="1d"), t.info
+    t = yf.Ticker(ticker)
+    hist = pd.DataFrame()
+    try:
+        hist = t.history(period=period, interval="1d")
+    except Exception:
+        pass
+    if hist.empty:
+        try:
+            hist = yf.download(ticker, period=period, interval="1d", progress=False, auto_adjust=True)
+            if not hist.empty and isinstance(hist.columns, pd.MultiIndex):
+                hist.columns = hist.columns.droplevel(1)
+        except Exception:
+            pass
+    try:
+        info = t.info
+        if not isinstance(info, dict) or len(info) <= 1:
+            info = {}
+    except Exception:
+        info = {}
+    return hist, info
 
 def build_chart(df):
     fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.55,0.25,0.20], vertical_spacing=0.03)
@@ -152,7 +171,7 @@ if analyze_btn and ticker_input:
     ticker = ticker_input.strip().upper()
     with st.spinner(f"Fetching {ticker}..."):
         try: hist, info = fetch_data(ticker, period)
-        except: st.error(f"Could not fetch {ticker}. Check the ticker."); st.stop()
+        except Exception as e: st.error(f"Could not fetch {ticker}. Check the ticker. ({e})"); st.stop()
     if hist.empty or len(hist) < 10: st.error("No data. Check ticker symbol."); st.stop()
 
     hist = compute_indicators(hist)
