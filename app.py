@@ -76,13 +76,13 @@ def build_chart(df):
     fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], increasing_line_color="#00f5d4", decreasing_line_color="#ff6b6b", name="Price"), row=1, col=1)
     for col, color, name in [("EMA_20","#f5a623","EMA 20"),("EMA_50","#c77dff","EMA 50"),("EMA_200","#ff6b6b","EMA 200")]:
         fig.add_trace(go.Scatter(x=df.index, y=df[col], name=name, line=dict(color=color, width=1.2)), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df.index, y=df["BB_Upper"], line=dict(color="#ffffff18", width=1, dash="dot"), showlegend=False), row=1, col=1)
-    fig.add_trace(go.Scatter(x=df.index, y=df["BB_Lower"], line=dict(color="#ffffff18", width=1, dash="dot"), fill="tonexty", fillcolor="rgba(255,255,255,0.02)", showlegend=False), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df["BB_Upper"], line=dict(color="rgba(255,255,255,0.09)", width=1, dash="dot"), showlegend=False), row=1, col=1)
+    fig.add_trace(go.Scatter(x=df.index, y=df["BB_Lower"], line=dict(color="rgba(255,255,255,0.09)", width=1, dash="dot"), fill="tonexty", fillcolor="rgba(255,255,255,0.02)", showlegend=False), row=1, col=1)
     colors = ["#00f5d4" if c >= o else "#ff6b6b" for c,o in zip(df["Close"], df["Open"])]
     fig.add_trace(go.Bar(x=df.index, y=df["Volume"], marker_color=colors, opacity=0.7, showlegend=False), row=2, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df["RSI"], line=dict(color="#c77dff", width=1.5), showlegend=False), row=3, col=1)
-    fig.add_hline(y=70, line_dash="dot", line_color="#ff6b6b50", row=3, col=1)
-    fig.add_hline(y=30, line_dash="dot", line_color="#00f5d450", row=3, col=1)
+    fig.add_hline(y=70, line_dash="dot", line_color="rgba(255,107,107,0.31)", row=3, col=1)
+    fig.add_hline(y=30, line_dash="dot", line_color="rgba(0,245,212,0.31)", row=3, col=1)
     fig.update_layout(plot_bgcolor="#0d0d1a", paper_bgcolor="#080810", font=dict(family="IBM Plex Mono", color="#888", size=11), xaxis_rangeslider_visible=False, legend=dict(orientation="h", yanchor="bottom", y=1.01, bgcolor="rgba(0,0,0,0)", font=dict(size=10)), margin=dict(l=0,r=0,t=30,b=0), height=560)
     for i in range(1,4):
         fig.update_xaxes(row=i, col=1, gridcolor="#111122", zeroline=False)
