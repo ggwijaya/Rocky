@@ -5,7 +5,7 @@ import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-st.set_page_config(page_title="SIGNAL — Stock Intelligence", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Rocky Signal — Stock Intelligence", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
@@ -147,7 +147,7 @@ def generate_verdict(score, df):
     return {"action":action,"color":color,"bias":bias,"score":score,"stop":stop,"target":target,"atr":atr,"rr":rr}
 
 # ── UI ──
-st.markdown("<div style='margin-bottom:8px'><span style='font-family:Bebas Neue,sans-serif;font-size:38px;letter-spacing:0.15em;color:#fff'>SIGNAL</span><span style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#333;margin-left:12px;letter-spacing:0.2em'>STOCK INTELLIGENCE TERMINAL</span></div><div style='height:2px;background:linear-gradient(90deg,#00f5d4,transparent);width:200px;margin-bottom:28px'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-bottom:12px'><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#00f5d4;text-shadow:0 0 40px rgba(0,245,212,0.45)'>ROCKY</span><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#fff;margin-left:14px'>SIGNAL</span><br><span style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#444;letter-spacing:0.25em'>STOCK INTELLIGENCE TERMINAL</span></div><div style='height:2px;background:linear-gradient(90deg,#00f5d4,transparent);width:320px;margin-bottom:32px'></div>", unsafe_allow_html=True)
 
 col_in, col_period, col_btn = st.columns([3, 1.5, 1])
 with col_in: ticker_input = st.text_input("", placeholder="TICKER — e.g. BBCA.JK, ^JKSE, AAPL, BTC-USD", label_visibility="collapsed")
@@ -236,7 +236,7 @@ if analyze_btn and ticker_input:
         with st.expander("🏢 COMPANY OVERVIEW"):
             st.markdown(f'<div style="font-size:12px;color:#aaa;line-height:1.8">{info["longBusinessSummary"]}</div>', unsafe_allow_html=True)
 
-    st.markdown('<br><div style="font-size:10px;color:#222;text-align:center">SIGNAL TERMINAL — DATA VIA YAHOO FINANCE — NOT FINANCIAL ADVICE</div>', unsafe_allow_html=True)
+    st.markdown('<br><div style="font-size:10px;color:#222;text-align:center">ROCKY SIGNAL TERMINAL — DATA VIA YAHOO FINANCE — NOT FINANCIAL ADVICE</div>', unsafe_allow_html=True)
 
 elif not ticker_input:
     st.markdown("<div style='text-align:center;padding:60px 0'><div style='font-size:52px;margin-bottom:16px'>📡</div><div style='font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:0.2em;color:#1e1e30'>AWAITING TICKER INPUT</div><div style='font-size:11px;color:#151520;margin-top:10px'>AAPL · TSLA · NVDA · BTC-USD · ^JKSE · BBCA.JK · TLKM.JK</div></div>", unsafe_allow_html=True)
