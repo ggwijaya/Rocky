@@ -175,7 +175,7 @@ st.markdown("<div class='rocky-hero' style='margin-bottom:12px'><span style='fon
 
 col_in, col_period, col_btn = st.columns([3, 1.5, 1])
 with col_in: ticker_input = st.text_input("", placeholder="TICKER — e.g. BBCA.JK, ^JKSE, AAPL, BTC-USD", label_visibility="collapsed")
-with col_period: period = st.selectbox("PERIOD", ["1mo","3mo","6mo","1y","2y"], index=2, label_visibility="collapsed")
+with col_period: period = st.selectbox("PERIOD", ["1mo","3mo","6mo","1y","2y"], index=2, label_visibility="collapsed", format_func=lambda x: f"PERIOD · {x}")
 with col_btn: analyze_btn = st.button("ANALYZE")
 
 IDX = {"🇮🇩 INDICES":{"IHSG":"^JKSE","LQ45":"^JKLQ45"},"🏦 Banking":{"BBCA":"BBCA.JK","BBRI":"BBRI.JK","BMRI":"BMRI.JK","BBNI":"BBNI.JK"},"⚡ Energy":{"ADRO":"ADRO.JK","PTBA":"PTBA.JK","INCO":"INCO.JK","MEDC":"MEDC.JK"},"📱 Telco":{"TLKM":"TLKM.JK","EXCL":"EXCL.JK","GOTO":"GOTO.JK","BUKA":"BUKA.JK"},"🏭 Consumer":{"UNVR":"UNVR.JK","ICBP":"ICBP.JK","ASII":"ASII.JK","KLBF":"KLBF.JK"}}
@@ -202,6 +202,11 @@ if analyze_btn and ticker_input:
     last = hist.iloc[-1]; prev = hist.iloc[-2]
     price = last["Close"]; change = price - prev["Close"]; pct_chg = (change / prev["Close"]) * 100
 
+    # Fall back to hist-derived values when info is sparse (common for IDX/indices)
+    _52w_high = info.get("fiftyTwoWeekHigh") or hist["High"].max()
+    _52w_low = info.get("fiftyTwoWeekLow") or hist["Low"].min()
+    _avg_vol = info.get("averageVolume") or hist["Volume"].mean()
+
     currency = info.get("currency","USD")
     is_idr = currency=="IDR" or ticker.endswith(".JK") or ticker in ["^JKSE","^JKLQ45"]
     ccy = "Rp " if is_idr else ("$" if currency in ["USD",""] else currency+" ")
@@ -226,7 +231,7 @@ if analyze_btn and ticker_input:
     badge = '<span style="background:rgba(255,214,10,0.1);border:1px solid #ffd60a30;border-radius:4px;padding:2px 8px;font-size:10px;color:#ffd60a">IDX · INDONESIA</span>' if is_idr else ""
     st.markdown(f"<div style='display:flex;align-items:baseline;gap:16px;margin-bottom:20px;flex-wrap:wrap'><span style='font-family:Bebas Neue,sans-serif;font-size:32px;color:#00f5d4'>{ticker}</span>{badge}<span style='font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff'>{p(price)}</span><span style='font-size:14px;color:{'#00f5d4' if change>=0 else '#ff6b6b'}'>{'&#9650;' if change>=0 else '&#9660;'} {p(abs(change))} ({abs(pct_chg):.2f}%)</span><span style='font-size:11px;color:#333;margin-left:auto'>{info.get('longName','')}</span></div>", unsafe_allow_html=True)
 
-    mvals = [("MKT CAP",big(info.get("marketCap"))),("52W HIGH",p(info.get("fiftyTwoWeekHigh"))),("52W LOW",p(info.get("fiftyTwoWeekLow"))),("AVG VOL",fmt_large(info.get("averageVolume"))),("BETA",fmt(info.get("beta"),decimals=2))]
+    mvals = [("MKT CAP",big(info.get("marketCap"))),("52W HIGH",p(_52w_high)),("52W LOW",p(_52w_low)),("AVG VOL",fmt_large(_avg_vol)),("BETA",fmt(info.get("beta"),decimals=2))]
     st.markdown('<div class="metrics-grid">'+''.join(f'<div class="metric-tile"><div class="m-label">{lbl}</div><div class="m-value">{val}</div></div>' for lbl,val in mvals)+'</div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
