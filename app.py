@@ -4,7 +4,6 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import requests
 
 st.set_page_config(page_title="Rocky Signal — Stock Intelligence", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -26,7 +25,7 @@ div[data-testid="stMetricLabel"] { font-size: 11px !important; letter-spacing: 0
 .stButton>button { background: #00f5d4 !important; color: #080810 !important; border: none !important; font-family: 'Bebas Neue', sans-serif !important; font-size: 16px !important; letter-spacing: 0.15em !important; border-radius: 8px !important; padding: 10px 28px !important; }
 .stTextInput>div>div>input { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.12) !important; border-radius: 8px !important; color: #fff !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 15px !important; letter-spacing: 0.1em !important; }
 footer { visibility: hidden; } #MainMenu { visibility: hidden; } header[data-testid="stHeader"] { display: none !important; }
-.metrics-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 8px 0 16px; }
+.metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0 16px; }
 .metric-tile { text-align: center; padding: 8px 4px; }
 .m-label { font-size: 11px; letter-spacing: 0.08em; color: #666; margin-bottom: 4px; }
 .m-value { font-family: 'Bebas Neue', sans-serif !important; font-size: 26px; color: #e0e0e0; line-height: 1.1; }
@@ -107,8 +106,7 @@ def fetch_data(ticker, period):
                 hist.columns = hist.columns.droplevel(1)
         except Exception:
             pass
-    # t.info uses Yahoo Finance quoteSummary — often blocked/rate-limited in
-    # cloud envs; keep whatever it returns without discarding on key count
+    # 1. t.info — comprehensive quoteSummary, best when available
     info = {}
     try:
         raw = t.info
@@ -116,7 +114,28 @@ def fetch_data(ticker, period):
             info = raw
     except Exception:
         pass
-    # fast_info: lightweight chart-API endpoint, reliable for price metrics
+    # 2. If info is sparse, re-try via yfinance's own authenticated session.
+    #    Direct requests.get() fails because YF now requires a crumb token;
+    #    t._data.get_raw_json() injects it automatically.
+    if not info.get("trailingPE"):
+        try:
+            _yfdata = getattr(t, '_data', None)
+            if _yfdata:
+                _get = getattr(_yfdata, 'get_raw_json', None)
+                if _get:
+                    url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
+                    raw = _get(url, params={"modules": "defaultKeyStatistics,summaryDetail,financialData", "formatted": "false"})
+                    result = (raw or {}).get("quoteSummary", {}).get("result") or []
+                    if result:
+                        for mod in result[0].values():
+                            if isinstance(mod, dict):
+                                for k, v in mod.items():
+                                    val = v.get("raw") if isinstance(v, dict) and "raw" in v else (None if isinstance(v, dict) else v)
+                                    if val is not None:
+                                        info.setdefault(k, val)
+        except Exception:
+            pass
+    # 3. fast_info — chart API, reliable everywhere for price metrics
     try:
         fi = t.fast_info
         for key, attr in [("marketCap","market_cap"),("fiftyTwoWeekHigh","year_high"),
@@ -128,30 +147,18 @@ def fetch_data(ticker, period):
                     info[key] = val
     except Exception:
         pass
-    # Direct v7 quote API: same endpoint class as fast_info, returns
-    # fundamentals (PE, EPS, P/B, beta, dividend) that quoteSummary misses
-    try:
-        r = requests.get(
-            f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={ticker}",
-            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"},
-            timeout=8
-        )
-        if r.status_code == 200:
-            res = r.json().get("quoteResponse", {}).get("result", [])
-            if res:
-                q = res[0]
-                for ik, qk in [("trailingPE","trailingPE"),("forwardPE","forwardPE"),
-                               ("trailingEps","epsTrailingTwelveMonths"),("forwardEps","epsForward"),
-                               ("priceToBook","priceToBook"),("beta","beta"),
-                               ("marketCap","marketCap")]:
-                    if not info.get(ik) and q.get(qk) is not None:
-                        info[ik] = q[qk]
-                if not info.get("dividendYield"):
-                    dy = q.get("trailingAnnualDividendYield") or q.get("dividendYield")
-                    if dy is not None:
-                        info["dividendYield"] = dy
-    except Exception:
-        pass
+    # 4. Dividend yield from t.dividends (chart API — works in all envs)
+    if not info.get("dividendYield") and not hist.empty:
+        try:
+            divs = t.dividends
+            if not divs.empty:
+                cutoff = pd.Timestamp.now(tz=divs.index.tz) - pd.DateOffset(years=1)
+                annual_div = float(divs[divs.index >= cutoff].sum())
+                last_px = float(hist["Close"].iloc[-1])
+                if annual_div > 0 and last_px > 0:
+                    info["dividendYield"] = annual_div / last_px
+        except Exception:
+            pass
     return hist, info
 
 def build_chart(df):
@@ -213,10 +220,11 @@ def generate_verdict(score, df):
 # ── UI ──
 st.markdown("<div class='rocky-hero' style='margin-bottom:12px'><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#00f5d4;text-shadow:0 0 40px rgba(0,245,212,0.45)'>ROCKY</span><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#fff;margin-left:14px'>SIGNAL</span><br><span class='hero-subtitle' style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#444;letter-spacing:0.25em'>STOCK INTELLIGENCE TERMINAL</span></div><div class='rocky-divider' style='height:2px;background:linear-gradient(90deg,#00f5d4,transparent);width:320px;margin-bottom:32px'></div>", unsafe_allow_html=True)
 
-col_in, col_period, col_btn = st.columns([3, 1.5, 1])
-with col_in: ticker_input = st.text_input("", placeholder="TICKER — e.g. BBCA.JK, ^JKSE, AAPL, BTC-USD", label_visibility="collapsed")
-with col_period: period = st.selectbox("PERIOD", ["1mo","3mo","6mo","1y","2y"], index=2, label_visibility="collapsed", format_func=lambda x: f"PERIOD · {x}")
-with col_btn: analyze_btn = st.button("ANALYZE")
+with st.form("ticker_form"):
+    col_in, col_period, col_btn = st.columns([3, 1.5, 1])
+    with col_in: ticker_input = st.text_input("", placeholder="TICKER — e.g. BBCA.JK, ^JKSE, AAPL, BTC-USD", label_visibility="collapsed")
+    with col_period: period = st.selectbox("PERIOD", ["1mo","3mo","6mo","1y","2y"], index=0, label_visibility="collapsed", format_func=lambda x: f"PERIOD · {x}")
+    with col_btn: analyze_btn = st.form_submit_button("ANALYZE")
 
 IDX = {"🇮🇩 INDICES":{"IHSG":"^JKSE","LQ45":"^JKLQ45"},"🏦 Banking":{"BBCA":"BBCA.JK","BBRI":"BBRI.JK","BMRI":"BMRI.JK","BBNI":"BBNI.JK"},"⚡ Energy":{"ADRO":"ADRO.JK","PTBA":"PTBA.JK","INCO":"INCO.JK","MEDC":"MEDC.JK"},"📱 Telco":{"TLKM":"TLKM.JK","EXCL":"EXCL.JK","GOTO":"GOTO.JK","BUKA":"BUKA.JK"},"🏭 Consumer":{"UNVR":"UNVR.JK","ICBP":"ICBP.JK","ASII":"ASII.JK","KLBF":"KLBF.JK"}}
 with st.expander("🇮🇩  IDX QUICK SELECT"):
@@ -271,7 +279,7 @@ if analyze_btn and ticker_input:
     badge = '<span style="background:rgba(255,214,10,0.1);border:1px solid #ffd60a30;border-radius:4px;padding:2px 8px;font-size:10px;color:#ffd60a">IDX · INDONESIA</span>' if is_idr else ""
     st.markdown(f"<div style='display:flex;align-items:baseline;gap:16px;margin-bottom:20px;flex-wrap:wrap'><span style='font-family:Bebas Neue,sans-serif;font-size:32px;color:#00f5d4'>{ticker}</span>{badge}<span style='font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff'>{p(price)}</span><span style='font-size:14px;color:{'#00f5d4' if change>=0 else '#ff6b6b'}'>{'&#9650;' if change>=0 else '&#9660;'} {p(abs(change))} ({abs(pct_chg):.2f}%)</span><span style='font-size:11px;color:#333;margin-left:auto'>{info.get('longName','')}</span></div>", unsafe_allow_html=True)
 
-    mvals = [("MKT CAP",big(info.get("marketCap"))),("52W HIGH",p(_52w_high)),("52W LOW",p(_52w_low)),("AVG VOL",fmt_large(_avg_vol)),("BETA",fmt(info.get("beta"),decimals=2))]
+    mvals = [("MKT CAP",big(info.get("marketCap"))),("52W HIGH",p(_52w_high)),("52W LOW",p(_52w_low)),("AVG VOL",fmt_large(_avg_vol))]
     st.markdown('<div class="metrics-grid">'+''.join(f'<div class="metric-tile"><div class="m-label">{lbl}</div><div class="m-value">{val}</div></div>' for lbl,val in mvals)+'</div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
