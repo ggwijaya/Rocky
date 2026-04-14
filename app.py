@@ -170,7 +170,7 @@ st.markdown("<div class='rocky-hero' style='margin-bottom:12px'><span style='fon
 
 col_in, col_period, col_btn = st.columns([3, 1.5, 1])
 with col_in: ticker_input = st.text_input("", placeholder="TICKER — e.g. BBCA.JK, ^JKSE, AAPL, BTC-USD", label_visibility="collapsed")
-with col_period: period = st.selectbox("", ["1mo","3mo","6mo","1y","2y"], index=2, label_visibility="collapsed")
+with col_period: period = st.selectbox("PERIOD", ["1mo","3mo","6mo","1y","2y"], index=2)
 with col_btn: analyze_btn = st.button("ANALYZE")
 
 IDX = {"🇮🇩 INDICES":{"IHSG":"^JKSE","LQ45":"^JKLQ45"},"🏦 Banking":{"BBCA":"BBCA.JK","BBRI":"BBRI.JK","BMRI":"BMRI.JK","BBNI":"BBNI.JK"},"⚡ Energy":{"ADRO":"ADRO.JK","PTBA":"PTBA.JK","INCO":"INCO.JK","MEDC":"MEDC.JK"},"📱 Telco":{"TLKM":"TLKM.JK","EXCL":"EXCL.JK","GOTO":"GOTO.JK","BUKA":"BUKA.JK"},"🏭 Consumer":{"UNVR":"UNVR.JK","ICBP":"ICBP.JK","ASII":"ASII.JK","KLBF":"KLBF.JK"}}
