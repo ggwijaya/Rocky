@@ -12,7 +12,7 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;700&display=swap');
 html, body, [class*="css"] { background-color: #080810 !important; color: #e0e0e0 !important; font-family: 'IBM Plex Mono', monospace !important; }
 .main { background-color: #080810 !important; }
-.block-container { padding-top: 2rem !important; max-width: 1100px !important; }
+.block-container { padding-top: 0.5rem !important; max-width: 1100px !important; }
 h1, h2, h3 { font-family: 'Bebas Neue', sans-serif !important; letter-spacing: 0.12em !important; }
 .tag { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; margin: 2px; }
 .tag-bull { background: rgba(0,245,212,0.15); color: #00f5d4; border: 1px solid #00f5d430; }
@@ -25,6 +25,10 @@ div[data-testid="stMetricLabel"] { font-size: 11px !important; letter-spacing: 0
 .stButton>button { background: #00f5d4 !important; color: #080810 !important; border: none !important; font-family: 'Bebas Neue', sans-serif !important; font-size: 16px !important; letter-spacing: 0.15em !important; border-radius: 8px !important; padding: 10px 28px !important; }
 .stTextInput>div>div>input { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.12) !important; border-radius: 8px !important; color: #fff !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 15px !important; letter-spacing: 0.1em !important; }
 footer { visibility: hidden; } #MainMenu { visibility: hidden; }
+.metrics-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 8px 0 16px; }
+.metric-tile { text-align: center; padding: 8px 4px; }
+.m-label { font-size: 11px; letter-spacing: 0.08em; color: #666; margin-bottom: 4px; }
+.m-value { font-family: 'Bebas Neue', sans-serif !important; font-size: 26px; color: #e0e0e0; line-height: 1.1; }
 /* ── MOBILE RESPONSIVE ── */
 @media (max-width: 768px) {
     .block-container { max-width: 100% !important; padding-left: 0.75rem !important; padding-right: 0.75rem !important; }
@@ -41,6 +45,7 @@ footer { visibility: hidden; } #MainMenu { visibility: hidden; }
     div[data-testid="stHorizontalBlock"] > div[data-testid="column"] { flex: 0 0 50% !important; max-width: 50% !important; min-width: 0 !important; box-sizing: border-box !important; text-align: center !important; }
     .verdict-box { padding: 14px 16px !important; }
     .js-plotly-plot, .plotly-graph-div { touch-action: pan-y !important; }
+    .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -170,7 +175,7 @@ st.markdown("<div class='rocky-hero' style='margin-bottom:12px'><span style='fon
 
 col_in, col_period, col_btn = st.columns([3, 1.5, 1])
 with col_in: ticker_input = st.text_input("", placeholder="TICKER — e.g. BBCA.JK, ^JKSE, AAPL, BTC-USD", label_visibility="collapsed")
-with col_period: period = st.selectbox("PERIOD", ["1mo","3mo","6mo","1y","2y"], index=2)
+with col_period: period = st.selectbox("PERIOD", ["1mo","3mo","6mo","1y","2y"], index=2, label_visibility="collapsed")
 with col_btn: analyze_btn = st.button("ANALYZE")
 
 IDX = {"🇮🇩 INDICES":{"IHSG":"^JKSE","LQ45":"^JKLQ45"},"🏦 Banking":{"BBCA":"BBCA.JK","BBRI":"BBRI.JK","BMRI":"BMRI.JK","BBNI":"BBNI.JK"},"⚡ Energy":{"ADRO":"ADRO.JK","PTBA":"PTBA.JK","INCO":"INCO.JK","MEDC":"MEDC.JK"},"📱 Telco":{"TLKM":"TLKM.JK","EXCL":"EXCL.JK","GOTO":"GOTO.JK","BUKA":"BUKA.JK"},"🏭 Consumer":{"UNVR":"UNVR.JK","ICBP":"ICBP.JK","ASII":"ASII.JK","KLBF":"KLBF.JK"}}
@@ -221,9 +226,8 @@ if analyze_btn and ticker_input:
     badge = '<span style="background:rgba(255,214,10,0.1);border:1px solid #ffd60a30;border-radius:4px;padding:2px 8px;font-size:10px;color:#ffd60a">IDX · INDONESIA</span>' if is_idr else ""
     st.markdown(f"<div style='display:flex;align-items:baseline;gap:16px;margin-bottom:20px;flex-wrap:wrap'><span style='font-family:Bebas Neue,sans-serif;font-size:32px;color:#00f5d4'>{ticker}</span>{badge}<span style='font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff'>{p(price)}</span><span style='font-size:14px;color:{'#00f5d4' if change>=0 else '#ff6b6b'}'>{'&#9650;' if change>=0 else '&#9660;'} {p(abs(change))} ({abs(pct_chg):.2f}%)</span><span style='font-size:11px;color:#333;margin-left:auto'>{info.get('longName','')}</span></div>", unsafe_allow_html=True)
 
-    m1,m2,m3,m4,m5 = st.columns(5)
-    for col,label,val in [(m1,"MKT CAP",big(info.get("marketCap"))),(m2,"52W HIGH",p(info.get("fiftyTwoWeekHigh"))),(m3,"52W LOW",p(info.get("fiftyTwoWeekLow"))),(m4,"AVG VOL",fmt_large(info.get("averageVolume"))),(m5,"BETA",fmt(info.get("beta"),decimals=2))]:
-        col.metric(label, val)
+    mvals = [("MKT CAP",big(info.get("marketCap"))),("52W HIGH",p(info.get("fiftyTwoWeekHigh"))),("52W LOW",p(info.get("fiftyTwoWeekLow"))),("AVG VOL",fmt_large(info.get("averageVolume"))),("BETA",fmt(info.get("beta"),decimals=2))]
+    st.markdown('<div class="metrics-grid">'+''.join(f'<div class="metric-tile"><div class="m-label">{lbl}</div><div class="m-value">{val}</div></div>' for lbl,val in mvals)+'</div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="section-header">📈 PRICE CHART + INDICATORS</div>', unsafe_allow_html=True)
