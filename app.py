@@ -37,8 +37,8 @@ footer { visibility: hidden; } #MainMenu { visibility: hidden; }
     [data-testid="stMetricDelta"] { justify-content: center !important; }
     .rocky-hero .hero-subtitle { font-size: 11px !important; letter-spacing: 0.25em !important; }
     .section-header { text-align: center !important; }
-    div[data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; }
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] { min-width: 45% !important; flex: 1 1 45% !important; }
+    div[data-testid="stHorizontalBlock"] { flex-wrap: wrap !important; justify-content: center !important; }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] { min-width: 45% !important; flex: 1 1 45% !important; text-align: center !important; }
     .verdict-box { padding: 14px 16px !important; }
     .js-plotly-plot, .plotly-graph-div { touch-action: pan-y !important; }
 }
