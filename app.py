@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import requests
 
 st.set_page_config(page_title="Rocky Signal — Stock Intelligence", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -106,14 +107,16 @@ def fetch_data(ticker, period):
                 hist.columns = hist.columns.droplevel(1)
         except Exception:
             pass
+    # t.info uses Yahoo Finance quoteSummary — often blocked/rate-limited in
+    # cloud envs; keep whatever it returns without discarding on key count
+    info = {}
     try:
-        info = t.info
-        if not isinstance(info, dict) or len(info) <= 1:
-            info = {}
+        raw = t.info
+        if isinstance(raw, dict):
+            info = raw
     except Exception:
-        info = {}
-    # fast_info is a lightweight endpoint that works for nearly all tickers
-    # including IDX stocks and indices where t.info is often sparse
+        pass
+    # fast_info: lightweight chart-API endpoint, reliable for price metrics
     try:
         fi = t.fast_info
         for key, attr in [("marketCap","market_cap"),("fiftyTwoWeekHigh","year_high"),
@@ -123,6 +126,30 @@ def fetch_data(ticker, period):
                 val = getattr(fi, attr, None)
                 if val is not None:
                     info[key] = val
+    except Exception:
+        pass
+    # Direct v7 quote API: same endpoint class as fast_info, returns
+    # fundamentals (PE, EPS, P/B, beta, dividend) that quoteSummary misses
+    try:
+        r = requests.get(
+            f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={ticker}",
+            headers={"User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"},
+            timeout=8
+        )
+        if r.status_code == 200:
+            res = r.json().get("quoteResponse", {}).get("result", [])
+            if res:
+                q = res[0]
+                for ik, qk in [("trailingPE","trailingPE"),("forwardPE","forwardPE"),
+                               ("trailingEps","epsTrailingTwelveMonths"),("forwardEps","epsForward"),
+                               ("priceToBook","priceToBook"),("beta","beta"),
+                               ("marketCap","marketCap")]:
+                    if not info.get(ik) and q.get(qk) is not None:
+                        info[ik] = q[qk]
+                if not info.get("dividendYield"):
+                    dy = q.get("trailingAnnualDividendYield") or q.get("dividendYield")
+                    if dy is not None:
+                        info["dividendYield"] = dy
     except Exception:
         pass
     return hist, info
