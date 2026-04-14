@@ -12,7 +12,7 @@ st.markdown("""
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@400;500;700&display=swap');
 html, body, [class*="css"] { background-color: #080810 !important; color: #e0e0e0 !important; font-family: 'IBM Plex Mono', monospace !important; }
 .main { background-color: #080810 !important; }
-.block-container { padding-top: 0.5rem !important; max-width: 1100px !important; }
+.block-container { padding-top: 1.5rem !important; max-width: 1100px !important; }
 h1, h2, h3 { font-family: 'Bebas Neue', sans-serif !important; letter-spacing: 0.12em !important; }
 .tag { display: inline-block; padding: 2px 10px; border-radius: 4px; font-size: 11px; font-weight: 700; letter-spacing: 0.1em; margin: 2px; }
 .tag-bull { background: rgba(0,245,212,0.15); color: #00f5d4; border: 1px solid #00f5d430; }
@@ -24,7 +24,7 @@ div[data-testid="stMetricValue"] { font-family: 'Bebas Neue', sans-serif !import
 div[data-testid="stMetricLabel"] { font-size: 11px !important; letter-spacing: 0.08em !important; color: #666 !important; }
 .stButton>button { background: #00f5d4 !important; color: #080810 !important; border: none !important; font-family: 'Bebas Neue', sans-serif !important; font-size: 16px !important; letter-spacing: 0.15em !important; border-radius: 8px !important; padding: 10px 28px !important; }
 .stTextInput>div>div>input { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.12) !important; border-radius: 8px !important; color: #fff !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 15px !important; letter-spacing: 0.1em !important; }
-footer { visibility: hidden; } #MainMenu { visibility: hidden; }
+footer { visibility: hidden; } #MainMenu { visibility: hidden; } header[data-testid="stHeader"] { display: none !important; }
 .metrics-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 8px 0 16px; }
 .metric-tile { text-align: center; padding: 8px 4px; }
 .m-label { font-size: 11px; letter-spacing: 0.08em; color: #666; margin-bottom: 4px; }
@@ -112,6 +112,19 @@ def fetch_data(ticker, period):
             info = {}
     except Exception:
         info = {}
+    # fast_info is a lightweight endpoint that works for nearly all tickers
+    # including IDX stocks and indices where t.info is often sparse
+    try:
+        fi = t.fast_info
+        for key, attr in [("marketCap","market_cap"),("fiftyTwoWeekHigh","year_high"),
+                          ("fiftyTwoWeekLow","year_low"),("averageVolume","three_month_average_volume"),
+                          ("currency","currency")]:
+            if not info.get(key):
+                val = getattr(fi, attr, None)
+                if val is not None:
+                    info[key] = val
+    except Exception:
+        pass
     return hist, info
 
 def build_chart(df):
@@ -249,8 +262,17 @@ if analyze_btn and ticker_input:
         st.dataframe(pd.DataFrame(rows, columns=["Indicator","Value","Signal"]), use_container_width=True, hide_index=True, height=285)
     with cf:
         st.markdown('<div class="section-header">🏦 FUNDAMENTALS</div>', unsafe_allow_html=True)
-        fund_rows = [("P/E RATIO",fmt(info.get("trailingPE"),2)),("FWD P/E",fmt(info.get("forwardPE"),2)),("PEG RATIO",fmt(info.get("pegRatio"),2)),("P/S RATIO",fmt(info.get("priceToSalesTrailing12Months"),2)),("P/B RATIO",fmt(info.get("priceToBook"),2)),("EPS (TTM)",p(info.get("trailingEps"))),("FWD EPS",p(info.get("forwardEps"))),("REV GROWTH",pct(info.get("revenueGrowth"))),("PROFIT MARGIN",pct(info.get("profitMargins"))),("DEBT/EQUITY",fmt(info.get("debtToEquity"),2)),("DIVIDEND %",pct(info.get("dividendYield"))),("SHORT FLOAT",pct(info.get("shortPercentOfFloat")))]
-        st.dataframe(pd.DataFrame(fund_rows, columns=["Metric","Value"]), use_container_width=True, hide_index=True, height=460)
+        _pe = fmt(info.get("trailingPE"), 2)
+        if _pe == "N/A":
+            _eps = info.get("trailingEps")
+            if _eps and _eps != 0 and price:
+                _pe = fmt(price / _eps, 2)
+        fund_rows = [("P/E RATIO",_pe),("FWD P/E",fmt(info.get("forwardPE"),2)),("PEG RATIO",fmt(info.get("pegRatio"),2)),("P/S RATIO",fmt(info.get("priceToSalesTrailing12Months"),2)),("P/B RATIO",fmt(info.get("priceToBook"),2)),("EPS (TTM)",p(info.get("trailingEps"))),("FWD EPS",p(info.get("forwardEps"))),("REV GROWTH",pct(info.get("revenueGrowth"))),("PROFIT MARGIN",pct(info.get("profitMargins"))),("DEBT/EQUITY",fmt(info.get("debtToEquity"),2)),("DIVIDEND %",pct(info.get("dividendYield"))),("SHORT FLOAT",pct(info.get("shortPercentOfFloat")))]
+        visible = [(k, v) for k, v in fund_rows if v != "N/A"]
+        if visible:
+            st.dataframe(pd.DataFrame(visible, columns=["Metric","Value"]), use_container_width=True, hide_index=True, height=min(460, 45+36*len(visible)))
+        else:
+            st.markdown('<div style="font-size:11px;color:#444;padding:40px 0;text-align:center;line-height:2">Fundamental data not available<br>for this ticker via Yahoo Finance.</div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
     st.markdown('<div class="section-header">⚡ TRADER\'S VERDICT</div>', unsafe_allow_html=True)
