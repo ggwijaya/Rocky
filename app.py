@@ -19,10 +19,11 @@ h1, h2, h3 { font-family: 'Bebas Neue', sans-serif !important; letter-spacing: 0
 .tag-bear { background: rgba(255,107,107,0.15); color: #ff6b6b; border: 1px solid #ff6b6b30; }
 .tag-neut { background: rgba(245,166,35,0.15); color: #f5a623; border: 1px solid #f5a62330; }
 .section-header { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 0.18em; color: #00f5d4; border-bottom: 1px solid #00f5d420; padding-bottom: 6px; margin-bottom: 14px; }
+.ticker-sticky { position: sticky; top: 0; z-index: 200; background: rgba(8,8,16,0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(0,245,212,0.13); margin: 0 -2rem 16px; padding: 10px 2rem; }
 .verdict-box { background: rgba(255,214,10,0.06); border: 1px solid rgba(255,214,10,0.25); border-radius: 12px; padding: 20px 24px; margin-top: 10px; }
 div[data-testid="stMetricValue"] { font-family: 'Bebas Neue', sans-serif !important; font-size: 26px !important; }
 div[data-testid="stMetricLabel"] { font-size: 11px !important; letter-spacing: 0.08em !important; color: #666 !important; }
-.stButton>button { background: #00f5d4 !important; color: #080810 !important; border: none !important; font-family: 'Bebas Neue', sans-serif !important; font-size: 16px !important; letter-spacing: 0.15em !important; border-radius: 8px !important; padding: 10px 28px !important; }
+.stButton>button, .stFormSubmitButton>button { background: #00f5d4 !important; color: #080810 !important; border: none !important; font-family: 'Bebas Neue', sans-serif !important; font-size: 16px !important; letter-spacing: 0.15em !important; border-radius: 8px !important; padding: 10px 28px !important; }
 .stTextInput>div>div>input { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.12) !important; border-radius: 8px !important; color: #fff !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 15px !important; letter-spacing: 0.1em !important; }
 footer { visibility: hidden; } #MainMenu { visibility: hidden; } header[data-testid="stHeader"] { display: none !important; }
 .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0 16px; }
@@ -46,6 +47,9 @@ footer { visibility: hidden; } #MainMenu { visibility: hidden; } header[data-tes
     .verdict-box { padding: 14px 16px !important; }
     .js-plotly-plot, .plotly-graph-div { touch-action: pan-y !important; }
     .metrics-grid { grid-template-columns: repeat(2, 1fr) !important; }
+    div[data-testid="stFormSubmitButton"] button { width: 100% !important; }
+    .sug-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+    .sug-row div[data-testid="stButton"] button { font-size: 11px !important; padding: 3px 10px !important; border-radius: 20px !important; background: rgba(0,245,212,0.08) !important; border: 1px solid rgba(0,245,212,0.25) !important; color: #00f5d4 !important; min-width: 0 !important; }
 }
 </style>
 """, unsafe_allow_html=True)
@@ -277,7 +281,18 @@ if analyze_btn and ticker_input:
     def pct(v): return fmt(v*100 if v else None, suffix="%") if v else "N/A"
 
     badge = '<span style="background:rgba(255,214,10,0.1);border:1px solid #ffd60a30;border-radius:4px;padding:2px 8px;font-size:10px;color:#ffd60a">IDX · INDONESIA</span>' if is_idr else ""
-    st.markdown(f"<div style='display:flex;align-items:baseline;gap:16px;margin-bottom:20px;flex-wrap:wrap'><span style='font-family:Bebas Neue,sans-serif;font-size:32px;color:#00f5d4'>{ticker}</span>{badge}<span style='font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff'>{p(price)}</span><span style='font-size:14px;color:{'#00f5d4' if change>=0 else '#ff6b6b'}'>{'&#9650;' if change>=0 else '&#9660;'} {p(abs(change))} ({abs(pct_chg):.2f}%)</span><span style='font-size:11px;color:#333;margin-left:auto'>{info.get('longName','')}</span></div>", unsafe_allow_html=True)
+    chg_color = '#00f5d4' if change >= 0 else '#ff6b6b'
+    chg_arrow = '&#9650;' if change >= 0 else '&#9660;'
+    st.markdown(f"""
+<div class='ticker-sticky'>
+  <div style='display:flex;align-items:center;gap:14px;flex-wrap:wrap'>
+    <span style='font-family:Bebas Neue,sans-serif;font-size:28px;color:#00f5d4;letter-spacing:0.08em'>{ticker}</span>
+    {badge}
+    <span style='font-family:Bebas Neue,sans-serif;font-size:26px;color:#fff'>{p(price)}</span>
+    <span style='font-size:13px;color:{chg_color}'>{chg_arrow} {p(abs(change))} ({abs(pct_chg):.2f}%)</span>
+    <span style='font-size:11px;color:#444;margin-left:auto'>{info.get('longName','')}</span>
+  </div>
+</div>""", unsafe_allow_html=True)
 
     mvals = [("MKT CAP",big(info.get("marketCap"))),("52W HIGH",p(_52w_high)),("52W LOW",p(_52w_low)),("AVG VOL",fmt_large(_avg_vol))]
     st.markdown('<div class="metrics-grid">'+''.join(f'<div class="metric-tile"><div class="m-label">{lbl}</div><div class="m-value">{val}</div></div>' for lbl,val in mvals)+'</div>', unsafe_allow_html=True)
