@@ -278,6 +278,7 @@ if analyze_btn and ticker_input:
             if val>=1e6: return f"{s}{val/1e6:.2f}M"
             return f"{s}{val:,.0f}"
     def pct(v): return fmt(v*100 if v else None, suffix="%") if v else "N/A"
+    def esc(s): return s.replace('$', '&#36;')  # prevent Streamlit LaTeX parsing of $
 
     badge = '<span style="background:rgba(255,214,10,0.1);border:1px solid #ffd60a30;border-radius:4px;padding:2px 8px;font-size:10px;color:#ffd60a">IDX · INDONESIA</span>' if is_idr else ""
     chg_color = '#00f5d4' if change >= 0 else '#ff6b6b'
@@ -286,8 +287,8 @@ if analyze_btn and ticker_input:
 <div id="rocky-origin" style="display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap">
   <span style="font-family:Bebas Neue,sans-serif;font-size:32px;color:#00f5d4;letter-spacing:0.08em">{ticker}</span>
   {badge}
-  <span style="font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff">{p(price)}</span>
-  <span style="font-size:14px;color:{chg_color}">{chg_arrow} {p(abs(change))} ({abs(pct_chg):.2f}%)</span>
+  <span style="font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff">{esc(p(price))}</span>
+  <span style="font-size:14px;color:{chg_color}">{chg_arrow} {esc(p(abs(change)))} ({abs(pct_chg):.2f}%)</span>
   <span style="font-size:11px;color:#333;margin-left:auto">{info.get('longName','')}</span>
 </div>
 
@@ -297,8 +298,8 @@ if analyze_btn and ticker_input:
   <div style="display:flex;align-items:center;gap:14px;max-width:1100px;margin:0 auto;flex-wrap:wrap">
     <span style="font-family:Bebas Neue,sans-serif;font-size:22px;color:#00f5d4">{ticker}</span>
     {badge}
-    <span style="font-family:Bebas Neue,sans-serif;font-size:20px;color:#fff">{p(price)}</span>
-    <span style="font-size:12px;color:{chg_color}">{chg_arrow} {p(abs(change))} ({abs(pct_chg):.2f}%)</span>
+    <span style="font-family:Bebas Neue,sans-serif;font-size:20px;color:#fff">{esc(p(price))}</span>
+    <span style="font-size:12px;color:{chg_color}">{chg_arrow} {esc(p(abs(change)))} ({abs(pct_chg):.2f}%)</span>
     <span style="font-size:11px;color:#444;margin-left:auto">{info.get('longName','')}</span>
   </div>
 </div>
@@ -338,7 +339,7 @@ if analyze_btn and ticker_input:
 </script>
 """, unsafe_allow_html=True)
 
-    mvals = [("MKT CAP",big(info.get("marketCap"))),("52W HIGH",p(_52w_high)),("52W LOW",p(_52w_low)),("AVG VOL",fmt_large(_avg_vol))]
+    mvals = [("MKT CAP",esc(big(info.get("marketCap")))),("52W HIGH",esc(p(_52w_high))),("52W LOW",esc(p(_52w_low))),("AVG VOL",esc(fmt_large(_avg_vol)))]
     st.markdown('<div class="metrics-grid">'+''.join(f'<div class="metric-tile"><div class="m-label">{lbl}</div><div class="m-value">{val}</div></div>' for lbl,val in mvals)+'</div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -373,8 +374,8 @@ if analyze_btn and ticker_input:
     v = generate_verdict(score, hist)
     vc1,vc2,vc3,vc4 = st.columns(4)
     vc1.metric("ACTION",v["action"]); vc2.metric("SIGNAL SCORE",f"{v['score']:+d} / 10"); vc3.metric("STOP LOSS",p(v["stop"])); vc4.metric("TARGET",p(v["target"]))
-    atr_str = f"{ccy}{v['atr']:,.0f}" if is_idr else f"{ccy}{v['atr']:.2f}"
-    st.markdown(f"<div class='verdict-box'><span style='font-family:Bebas Neue,sans-serif;font-size:22px;color:{v['color']}'>{v['action']}</span><span style='font-size:12px;color:#666;margin-left:14px'>Score: {v['score']:+d} | R:R = 1:{v['rr']} | ATR = {atr_str}</span><br><br><span style='font-size:12px;color:#aaa;line-height:1.8'>&#128205; <b>Entry:</b> {p(price)} &nbsp; &#128721; <b>Stop:</b> {p(v['stop'])} &nbsp; &#127919; <b>Target:</b> {p(v['target'])}<br>Bias is <b style='color:{v['color']}'>{v['bias']}</b> from {len(signals)} signals: EMA · RSI · MACD · Volume · Bollinger Bands</span></div>", unsafe_allow_html=True)
+    atr_str = esc(f"{ccy}{v['atr']:,.0f}" if is_idr else f"{ccy}{v['atr']:.2f}")
+    st.markdown(f"<div class='verdict-box'><span style='font-family:Bebas Neue,sans-serif;font-size:22px;color:{v['color']}'>{v['action']}</span><span style='font-size:12px;color:#666;margin-left:14px'>Score: {v['score']:+d} | R:R = 1:{v['rr']} | ATR = {atr_str}</span><br><br><span style='font-size:12px;color:#aaa;line-height:1.8'>&#128205; <b>Entry:</b> {esc(p(price))} &nbsp; &#128721; <b>Stop:</b> {esc(p(v['stop']))} &nbsp; &#127919; <b>Target:</b> {esc(p(v['target']))}<br>Bias is <b style='color:{v['color']}'>{v['bias']}</b> from {len(signals)} signals: EMA · RSI · MACD · Volume · Bollinger Bands</span></div>", unsafe_allow_html=True)
 
     if info.get("longBusinessSummary"):
         with st.expander("🏢 COMPANY OVERVIEW"):
