@@ -95,6 +95,11 @@ def signal_tag(label, direction):
 @st.cache_data(ttl=300)
 def fetch_data(ticker, period):
     t = yf.Ticker(ticker)
+    _is_index  = ticker.startswith('^')
+    _is_crypto = (not _is_index and '-' in ticker and
+                  ticker.split('-')[-1].upper() in {'USD','BTC','ETH','EUR','GBP','JPY','USDT','USDC','AUD','CAD','CHF'})
+    _is_equity = not _is_index and not _is_crypto
+
     hist = pd.DataFrame()
     try:
         hist = t.history(period=period, interval="1d")
@@ -109,7 +114,8 @@ def fetch_data(ticker, period):
                 hist.columns = hist.columns.droplevel(1)
         except Exception:
             pass
-    # 1. t.info — comprehensive quoteSummary, best when available
+
+    # 1. t.info — quoteSummary (comprehensive; may be sparse in cloud envs)
     info = {}
     try:
         raw = t.info
@@ -117,10 +123,9 @@ def fetch_data(ticker, period):
             info = raw
     except Exception:
         pass
-    # 2. If info is sparse, re-try via yfinance's own authenticated session.
-    #    Direct requests.get() fails because YF now requires a crumb token;
-    #    t._data.get_raw_json() injects it automatically.
-    if not info.get("trailingPE"):
+
+    # 2. Authenticated quoteSummary retry — equities only (crypto/indices never have PE/EPS)
+    if _is_equity and not info.get("trailingPE"):
         try:
             _yfdata = getattr(t, '_data', None)
             if _yfdata:
@@ -138,7 +143,8 @@ def fetch_data(ticker, period):
                                         info.setdefault(k, val)
         except Exception:
             pass
-    # 3. fast_info — chart API, reliable everywhere for price metrics
+
+    # 3. fast_info — chart API, always reliable for price/market metrics
     try:
         fi = t.fast_info
         for key, attr in [("marketCap","market_cap"),("fiftyTwoWeekHigh","year_high"),
@@ -150,8 +156,9 @@ def fetch_data(ticker, period):
                     info[key] = val
     except Exception:
         pass
-    # 4. Dividend yield from t.dividends (chart API — works in all envs)
-    if not info.get("dividendYield") and not hist.empty:
+
+    # 4. Dividend yield — equities only (crypto/indices don't pay dividends)
+    if _is_equity and not info.get("dividendYield") and not hist.empty:
         try:
             divs = t.dividends
             if not divs.empty:
@@ -162,6 +169,7 @@ def fetch_data(ticker, period):
                     info["dividendYield"] = annual_div / last_px
         except Exception:
             pass
+
     return hist, info
 
 def build_chart(df):
