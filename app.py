@@ -19,7 +19,6 @@ h1, h2, h3 { font-family: 'Bebas Neue', sans-serif !important; letter-spacing: 0
 .tag-bear { background: rgba(255,107,107,0.15); color: #ff6b6b; border: 1px solid #ff6b6b30; }
 .tag-neut { background: rgba(245,166,35,0.15); color: #f5a623; border: 1px solid #f5a62330; }
 .section-header { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 0.18em; color: #00f5d4; border-bottom: 1px solid #00f5d420; padding-bottom: 6px; margin-bottom: 14px; }
-.ticker-sticky { position: sticky; top: 0; z-index: 200; background: rgba(8,8,16,0.94); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid rgba(0,245,212,0.13); margin: 0 -2rem 16px; padding: 10px 2rem; }
 .verdict-box { background: rgba(255,214,10,0.06); border: 1px solid rgba(255,214,10,0.25); border-radius: 12px; padding: 20px 24px; margin-top: 10px; }
 div[data-testid="stMetricValue"] { font-family: 'Bebas Neue', sans-serif !important; font-size: 26px !important; }
 div[data-testid="stMetricLabel"] { font-size: 11px !important; letter-spacing: 0.08em !important; color: #666 !important; }
@@ -284,15 +283,60 @@ if analyze_btn and ticker_input:
     chg_color = '#00f5d4' if change >= 0 else '#ff6b6b'
     chg_arrow = '&#9650;' if change >= 0 else '&#9660;'
     st.markdown(f"""
-<div class='ticker-sticky'>
-  <div style='display:flex;align-items:center;gap:14px;flex-wrap:wrap'>
-    <span style='font-family:Bebas Neue,sans-serif;font-size:28px;color:#00f5d4;letter-spacing:0.08em'>{ticker}</span>
+<div id="rocky-origin" style="display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap">
+  <span style="font-family:Bebas Neue,sans-serif;font-size:32px;color:#00f5d4;letter-spacing:0.08em">{ticker}</span>
+  {badge}
+  <span style="font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff">{p(price)}</span>
+  <span style="font-size:14px;color:{chg_color}">{chg_arrow} {p(abs(change))} ({abs(pct_chg):.2f}%)</span>
+  <span style="font-size:11px;color:#333;margin-left:auto">{info.get('longName','')}</span>
+</div>
+
+<div id="rocky-sticky" style="display:none;position:fixed;top:0;left:0;right:0;z-index:9999;
+  background:rgba(8,8,16,0.96);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border-bottom:1px solid rgba(0,245,212,0.15);padding:8px 24px">
+  <div style="display:flex;align-items:center;gap:14px;max-width:1100px;margin:0 auto;flex-wrap:wrap">
+    <span style="font-family:Bebas Neue,sans-serif;font-size:22px;color:#00f5d4">{ticker}</span>
     {badge}
-    <span style='font-family:Bebas Neue,sans-serif;font-size:26px;color:#fff'>{p(price)}</span>
-    <span style='font-size:13px;color:{chg_color}'>{chg_arrow} {p(abs(change))} ({abs(pct_chg):.2f}%)</span>
-    <span style='font-size:11px;color:#444;margin-left:auto'>{info.get('longName','')}</span>
+    <span style="font-family:Bebas Neue,sans-serif;font-size:20px;color:#fff">{p(price)}</span>
+    <span style="font-size:12px;color:{chg_color}">{chg_arrow} {p(abs(change))} ({abs(pct_chg):.2f}%)</span>
+    <span style="font-size:11px;color:#444;margin-left:auto">{info.get('longName','')}</span>
   </div>
-</div>""", unsafe_allow_html=True)
+</div>
+
+<script>
+(function(){{
+  var bar = document.getElementById('rocky-sticky');
+  var origin = document.getElementById('rocky-origin');
+  if (!bar) return;
+  var shown = false;
+  function getThreshold(){{
+    if (!origin) return 100;
+    var r = origin.getBoundingClientRect();
+    return (window.scrollY || 0) + r.bottom + 20;
+  }}
+  var threshold = 0;
+  function check(scrollTop){{
+    if (!threshold) threshold = getThreshold();
+    var show = scrollTop > threshold;
+    if (show !== shown){{ bar.style.display = show ? 'block' : 'none'; shown = show; }}
+  }}
+  var candidates = [
+    document.querySelector('section[data-testid="stMain"]'),
+    document.querySelector('section.main'),
+    document.querySelector('[data-testid="stAppViewContainer"]'),
+    document.querySelector('.main')
+  ].filter(Boolean);
+  if (!candidates.length) candidates = [window];
+  candidates.forEach(function(el){{
+    el.addEventListener('scroll', function(){{
+      check(el === window ? (window.scrollY||0) : el.scrollTop);
+    }}, {{passive:true}});
+  }});
+  window.addEventListener('scroll', function(){{ check(window.scrollY||0); }}, {{passive:true}});
+  setTimeout(function(){{ threshold = getThreshold(); }}, 800);
+}})();
+</script>
+""", unsafe_allow_html=True)
 
     mvals = [("MKT CAP",big(info.get("marketCap"))),("52W HIGH",p(_52w_high)),("52W LOW",p(_52w_low)),("AVG VOL",fmt_large(_avg_vol))]
     st.markdown('<div class="metrics-grid">'+''.join(f'<div class="metric-tile"><div class="m-label">{lbl}</div><div class="m-value">{val}</div></div>' for lbl,val in mvals)+'</div>', unsafe_allow_html=True)
