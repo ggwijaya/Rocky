@@ -378,9 +378,7 @@ if analyze_btn and ticker_input:
             st.markdown('<div style="font-size:11px;color:#444;padding:40px 0;text-align:center;line-height:2">Fundamental data not available<br>for this ticker via Yahoo Finance.</div>', unsafe_allow_html=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
-    long_name = info.get('longName','')
-    verdict_title = f"⚡ TRADER'S VERDICT — {ticker}" + (f" · {long_name}" if long_name else "")
-    st.markdown(f'<div class="section-header">{verdict_title}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-header">⚡ TRADER\'S VERDICT — {ticker}</div>', unsafe_allow_html=True)
     v = generate_verdict(score, hist)
     vc1,vc2,vc3,vc4 = st.columns(4)
     vc1.metric("ACTION",v["action"]); vc2.metric("SIGNAL SCORE",f"{v['score']:+d} / 10"); vc3.metric("STOP LOSS",p(v["stop"])); vc4.metric("TARGET",p(v["target"]))
