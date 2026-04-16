@@ -290,7 +290,7 @@ if analyze_btn and ticker_input:
 <div id="rocky-origin" style="display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap">
   <span style="font-family:Bebas Neue,sans-serif;font-size:52px;color:#00f5d4;letter-spacing:0.08em">{ticker}</span>
   {badge}
-  <span style="font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff">{esc(p(price))}</span>
+  <span style="font-family:Bebas Neue,sans-serif;font-size:{'28px' if badge else '48px'};color:#fff">{esc(p(price))}</span>
   <span style="font-size:14px;color:{chg_color}">{chg_arrow} {esc(p(abs(change)))} ({abs(pct_chg):.2f}%)</span>
   <span style="font-size:11px;color:#333;margin-left:auto">{info.get('longName','')}</span>
 </div>
