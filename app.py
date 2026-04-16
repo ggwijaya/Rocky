@@ -287,10 +287,10 @@ if analyze_btn and ticker_input:
     chg_color = '#00f5d4' if change >= 0 else '#ff6b6b'
     chg_arrow = '&#9650;' if change >= 0 else '&#9660;'
     st.markdown(f"""
-<div id="rocky-origin" style="display:flex;align-items:center;gap:14px;margin-bottom:20px;flex-wrap:wrap">
+<div id="rocky-origin" style="display:flex;align-items:{'center' if badge else 'flex-end'};gap:14px;margin-bottom:20px;flex-wrap:wrap">
   <span style="font-family:Bebas Neue,sans-serif;font-size:52px;color:#00f5d4;letter-spacing:0.08em">{ticker}</span>
   {badge}
-  <span style="font-family:Bebas Neue,sans-serif;font-size:{'28px' if badge else '48px'};color:#fff">{esc(p(price))}</span>
+  <span style="font-family:Bebas Neue,sans-serif;font-size:28px;color:#fff">{esc(p(price))}</span>
   <span style="font-size:14px;color:{chg_color}">{chg_arrow} {esc(p(abs(change)))} ({abs(pct_chg):.2f}%)</span>
   <span style="font-size:11px;color:#333;margin-left:auto">{info.get('longName','')}</span>
 </div>
