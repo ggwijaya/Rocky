@@ -241,6 +241,9 @@ st.markdown("---")
 
 if analyze_btn and ticker_input:
     ticker = ticker_input.strip().upper()
+    # Reject input with spaces or commas (multiple tickers)
+    if any(c in ticker for c in (' ', ',', ';', '\t')):
+        st.error("Enter one ticker at a time — e.g. AAPL, BTC-USD, BBCA.JK"); st.stop()
     with st.spinner(f"Fetching {ticker}..."):
         try: hist, info = fetch_data(ticker, period)
         except Exception as e: st.error(f"Could not fetch {ticker}. Check the ticker. ({e})"); st.stop()
