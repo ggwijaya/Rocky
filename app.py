@@ -237,17 +237,6 @@ with st.form("ticker_form"):
     with col_period: period = st.selectbox("PERIOD", ["1mo","3mo","6mo","1y","2y"], index=0, label_visibility="collapsed", format_func=lambda x: f"PERIOD · {x}")
     with col_btn: analyze_btn = st.form_submit_button("ANALYZE")
 
-IDX = {"🇮🇩 INDICES":{"IHSG":"^JKSE","LQ45":"^JKLQ45"},"🏦 Banking":{"BBCA":"BBCA.JK","BBRI":"BBRI.JK","BMRI":"BMRI.JK","BBNI":"BBNI.JK"},"⚡ Energy":{"ADRO":"ADRO.JK","PTBA":"PTBA.JK","INCO":"INCO.JK","MEDC":"MEDC.JK"},"📱 Telco":{"TLKM":"TLKM.JK","EXCL":"EXCL.JK","GOTO":"GOTO.JK","BUKA":"BUKA.JK"},"🏭 Consumer":{"UNVR":"UNVR.JK","ICBP":"ICBP.JK","ASII":"ASII.JK","KLBF":"KLBF.JK"}}
-with st.expander("🇮🇩  IDX QUICK SELECT"):
-    st.markdown('<div style="font-size:11px;color:#555;margin-bottom:10px">Indonesian stocks: <b style="color:#f5a623">CODE.JK</b> &nbsp;|&nbsp; IHSG index: <b style="color:#f5a623">^JKSE</b></div>', unsafe_allow_html=True)
-    quick_ticker = None
-    for sector, tickers in IDX.items():
-        st.markdown(f"<span style='font-size:10px;color:#444'>{sector}</span>", unsafe_allow_html=True)
-        cols = st.columns(len(tickers))
-        for col, (name, sym) in zip(cols, tickers.items()):
-            if col.button(name, key=f"q_{sym}"): quick_ticker = sym
-    if quick_ticker: ticker_input = quick_ticker; analyze_btn = True
-
 st.markdown("---")
 
 if analyze_btn and ticker_input:
