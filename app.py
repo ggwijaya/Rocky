@@ -4,6 +4,17 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from concurrent.futures import ThreadPoolExecutor
+
+_PLOTLY_CONFIG = {"scrollZoom": False, "staticPlot": True}
+
+_FAST_INFO_MAP = (
+    ("marketCap",          "market_cap"),
+    ("fiftyTwoWeekHigh",   "year_high"),
+    ("fiftyTwoWeekLow",    "year_low"),
+    ("averageVolume",      "three_month_average_volume"),
+    ("currency",           "currency"),
+)
 
 st.set_page_config(page_title="Rocky Signal — Stock Intelligence", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
 
@@ -18,7 +29,7 @@ h1, h2, h3 { font-family: 'Bebas Neue', sans-serif !important; letter-spacing: 0
 .tag-bull { background: rgba(0,245,212,0.15); color: #00f5d4; border: 1px solid #00f5d430; }
 .tag-bear { background: rgba(255,107,107,0.15); color: #ff6b6b; border: 1px solid #ff6b6b30; }
 .tag-neut { background: rgba(245,166,35,0.15); color: #f5a623; border: 1px solid #f5a62330; }
-.section-header { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 0.18em; color: #00f5d4; border-bottom: 1px solid #00f5d420; padding-bottom: 6px; margin-bottom: 14px; }
+.section-header { font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 0.18em; color: #00f5d4; border-bottom: 1px solid #00f5d420; padding-bottom: 6px; margin-top: 1.5rem; margin-bottom: 14px; }
 .verdict-box { background: rgba(255,214,10,0.06); border: 1px solid rgba(255,214,10,0.25); border-radius: 12px; padding: 20px 24px; margin-top: 10px; }
 div[data-testid="stMetricValue"] { font-family: 'Bebas Neue', sans-serif !important; font-size: 26px !important; }
 div[data-testid="stMetricLabel"] { font-size: 11px !important; letter-spacing: 0.08em !important; color: #666 !important; }
@@ -103,13 +114,37 @@ def fetch_data(ticker, period):
                   ticker.split('-')[-1].upper() in {'USD','BTC','ETH','EUR','GBP','JPY','USDT','USDC','AUD','CAD','CHF'})
     _is_equity = not _is_index and not _is_crypto
 
-    hist = pd.DataFrame()
-    try:
-        hist = t.history(period=period, interval="1d")
-        if not hist.empty and isinstance(hist.columns, pd.MultiIndex):
-            hist.columns = hist.columns.droplevel(1)
-    except Exception:
-        pass
+    # ── Tier 1: parallel I/O ──────────────────────────────────────────────────
+    def _fetch_hist():
+        try:
+            h = t.history(period=period, interval="1d")
+            if not h.empty and isinstance(h.columns, pd.MultiIndex):
+                h.columns = h.columns.droplevel(1)
+            return h
+        except Exception:
+            return pd.DataFrame()
+
+    def _fetch_info():
+        try:
+            raw = t.info
+            return raw if isinstance(raw, dict) else {}
+        except Exception:
+            return {}
+
+    def _fetch_divs():
+        try:
+            return t.dividends
+        except Exception:
+            return pd.Series(dtype=float)
+
+    with ThreadPoolExecutor(max_workers=3 if _is_equity else 2) as pool:
+        fut_hist = pool.submit(_fetch_hist)
+        fut_info = pool.submit(_fetch_info)
+        fut_divs = pool.submit(_fetch_divs) if _is_equity else None
+        hist = fut_hist.result()
+        info = fut_info.result()
+        divs = fut_divs.result() if fut_divs is not None else None
+
     if hist.empty:
         try:
             hist = yf.download(ticker, period=period, interval="1d", progress=False, auto_adjust=True)
@@ -117,15 +152,6 @@ def fetch_data(ticker, period):
                 hist.columns = hist.columns.droplevel(1)
         except Exception:
             pass
-
-    # 1. t.info — quoteSummary (comprehensive; may be sparse in cloud envs)
-    info = {}
-    try:
-        raw = t.info
-        if isinstance(raw, dict):
-            info = raw
-    except Exception:
-        pass
 
     # 2. Authenticated quoteSummary retry — equities only (crypto/indices never have PE/EPS)
     if _is_equity and not info.get("trailingPE"):
@@ -150,9 +176,7 @@ def fetch_data(ticker, period):
     # 3. fast_info — chart API, always reliable for price/market metrics
     try:
         fi = t.fast_info
-        for key, attr in [("marketCap","market_cap"),("fiftyTwoWeekHigh","year_high"),
-                          ("fiftyTwoWeekLow","year_low"),("averageVolume","three_month_average_volume"),
-                          ("currency","currency")]:
+        for key, attr in _FAST_INFO_MAP:
             if not info.get(key):
                 val = getattr(fi, attr, None)
                 if val is not None:
@@ -160,10 +184,9 @@ def fetch_data(ticker, period):
     except Exception:
         pass
 
-    # 4. Dividend yield — equities only (crypto/indices don't pay dividends)
-    if _is_equity and not info.get("dividendYield") and not hist.empty:
+    # 4. Dividend yield — uses divs pre-fetched in parallel above
+    if _is_equity and not info.get("dividendYield") and not hist.empty and divs is not None:
         try:
-            divs = t.dividends
             if not divs.empty:
                 cutoff = pd.Timestamp.now(tz=divs.index.tz) - pd.DateOffset(years=1)
                 annual_div = float(divs[divs.index >= cutoff].sum())
@@ -230,6 +253,15 @@ def generate_verdict(score, df):
     else: action,color,bias,stop,target = "WAIT / NEUTRAL","#f5a623","Neutral",price-atr*1.5,price+atr*3
     rr = round(abs(target-price)/abs(price-stop), 2) if abs(price-stop) > 0 else 0
     return {"action":action,"color":color,"bias":bias,"score":score,"stop":stop,"target":target,"atr":atr,"rr":rr}
+
+def _section_header(title: str) -> None:
+    st.markdown(f'<div class="section-header">{title}</div>', unsafe_allow_html=True)
+
+def _table(rows, cols, height=None) -> None:
+    kwargs = {"use_container_width": True, "hide_index": True}
+    if height is not None:
+        kwargs["height"] = height
+    st.dataframe(pd.DataFrame(rows, columns=cols), **kwargs)
 
 # ── UI ──
 st.markdown("<div class='rocky-hero' style='margin-bottom:12px'><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#00f5d4;text-shadow:0 0 40px rgba(0,245,212,0.45)'>ROCKY</span><span style='font-family:Bebas Neue,sans-serif;font-size:64px;letter-spacing:0.10em;color:#fff;margin-left:14px'>SIGNAL</span><br><span class='hero-subtitle' style='font-family:IBM Plex Mono,monospace;font-size:11px;color:#444;letter-spacing:0.25em'>STOCK INTELLIGENCE TERMINAL</span></div><div class='rocky-divider' style='height:2px;background:linear-gradient(90deg,#00f5d4,transparent);width:320px;margin-bottom:32px'></div>", unsafe_allow_html=True)
@@ -345,21 +377,19 @@ if analyze_btn and ticker_input:
     mvals = [("MKT CAP",esc(big(info.get("marketCap")))),("52W HIGH",esc(p(_52w_high))),("52W LOW",esc(p(_52w_low))),("AVG VOL",esc(fmt_large(_avg_vol)))]
     st.markdown('<div class="metrics-grid">'+''.join(f'<div class="metric-tile"><div class="m-label">{lbl}</div><div class="m-value">{val}</div></div>' for lbl,val in mvals)+'</div>', unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown('<div class="section-header">📈 PRICE CHART + INDICATORS</div>', unsafe_allow_html=True)
-    st.plotly_chart(build_chart(hist), use_container_width=True, config={"scrollZoom": False, "staticPlot": True})
+    _section_header("📈 PRICE CHART + INDICATORS")
+    st.plotly_chart(build_chart(hist), use_container_width=True, config=_PLOTLY_CONFIG)
 
     ct, cf = st.columns(2, gap="large")
     with ct:
-        st.markdown('<div class="section-header">⚡ TECHNICAL SIGNALS</div>', unsafe_allow_html=True)
+        _section_header("⚡ TECHNICAL SIGNALS")
         signals, score = evaluate_signals(hist, info)
         st.markdown(" ".join(signal_tag(s[1],s[0]) for s in signals), unsafe_allow_html=True)
-        st.markdown("<br>", unsafe_allow_html=True)
         rsi_val = last["RSI"]
         rows = [("PRICE",p(price),"—"),("EMA 20",p(last["EMA_20"]),"↑ Bull" if price>last["EMA_20"] else "↓ Bear"),("EMA 50",p(last["EMA_50"]),"↑ Bull" if price>last["EMA_50"] else "↓ Bear"),("EMA 200",p(last["EMA_200"]),"↑ Bull" if price>last["EMA_200"] else "↓ Bear"),("RSI 14",fmt(rsi_val,1),"OB" if rsi_val>70 else ("OS" if rsi_val<30 else "Neutral")),("ATR 14",p(last["ATR"]),"Volatility"),("MACD",fmt(last["MACD"],2),"↑ Bull" if last["MACD"]>last["MACD_Signal"] else "↓ Bear")]
-        st.dataframe(pd.DataFrame(rows, columns=["Indicator","Value","Signal"]), use_container_width=True, hide_index=True, height=285)
+        _table(rows, ["Indicator","Value","Signal"], height=285)
     with cf:
-        st.markdown('<div class="section-header">🏦 FUNDAMENTALS</div>', unsafe_allow_html=True)
+        _section_header("🏦 FUNDAMENTALS")
         _pe = fmt(info.get("trailingPE"), 2)
         if _pe == "N/A":
             _eps = info.get("trailingEps")
@@ -368,12 +398,11 @@ if analyze_btn and ticker_input:
         fund_rows = [("P/E RATIO",_pe),("FWD P/E",fmt(info.get("forwardPE"),2)),("PEG RATIO",fmt(info.get("pegRatio"),2)),("P/S RATIO",fmt(info.get("priceToSalesTrailing12Months"),2)),("P/B RATIO",fmt(info.get("priceToBook"),2)),("EPS (TTM)",p(info.get("trailingEps"))),("FWD EPS",p(info.get("forwardEps"))),("REV GROWTH",pct(info.get("revenueGrowth"))),("PROFIT MARGIN",pct(info.get("profitMargins"))),("DEBT/EQUITY",fmt(info.get("debtToEquity"),2)),("DIVIDEND %",pct(info.get("dividendYield"))),("SHORT FLOAT",pct(info.get("shortPercentOfFloat")))]
         visible = [(k, v) for k, v in fund_rows if v != "N/A"]
         if visible:
-            st.dataframe(pd.DataFrame(visible, columns=["Metric","Value"]), use_container_width=True, hide_index=True, height=min(460, 45+36*len(visible)))
+            _table(visible, ["Metric","Value"], height=min(460, 45+36*len(visible)))
         else:
             st.markdown('<div style="font-size:11px;color:#444;padding:40px 0;text-align:center;line-height:2">Fundamental data not available<br>for this ticker via Yahoo Finance.</div>', unsafe_allow_html=True)
 
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.markdown(f'<div class="section-header">⚡ TRADER\'S VERDICT — {ticker}</div>', unsafe_allow_html=True)
+    _section_header(f"⚡ TRADER'S VERDICT — {ticker}")
     v = generate_verdict(score, hist)
     vc1,vc2,vc3,vc4 = st.columns(4)
     vc1.metric("ACTION",v["action"]); vc2.metric("SIGNAL SCORE",f"{v['score']:+d} / 10"); vc3.metric("STOP LOSS",p(v["stop"])); vc4.metric("TARGET",p(v["target"]))
