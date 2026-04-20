@@ -229,7 +229,8 @@ def evaluate_signals(df, info):
     if not pd.isna(rsi):
         if rsi > 70: signals.append(("bear",f"RSI OVERBOUGHT ({rsi:.1f})")); score -= 1
         elif rsi < 30: signals.append(("bull",f"RSI OVERSOLD ({rsi:.1f})")); score += 1
-        elif 45 <= rsi <= 60: signals.append(("bull",f"RSI HEALTHY ({rsi:.1f})")); score += 1
+        elif 45 <= rsi <= 60 and price > e50: signals.append(("bull",f"RSI HEALTHY ({rsi:.1f})")); score += 1
+        elif 40 <= rsi <= 55 and price < e50: signals.append(("bear",f"RSI WEAK ({rsi:.1f})")); score -= 1
         else: signals.append(("neut",f"RSI NEUTRAL ({rsi:.1f})"))
     macd, sig = last["MACD"], last["MACD_Signal"]
     if not pd.isna(macd) and not pd.isna(sig):
@@ -237,9 +238,17 @@ def evaluate_signals(df, info):
         elif macd > sig: signals.append(("bull","MACD BULLISH CROSSOVER")); score += 1
         elif macd < sig and macd < 0: signals.append(("bear","MACD BEARISH BELOW ZERO")); score -= 2
         else: signals.append(("bear","MACD BEARISH CROSSOVER")); score -= 1
+    hist_col = df["MACD_Hist"]
+    if len(hist_col) >= 3:
+        h1, h2, h3 = hist_col.iloc[-1], hist_col.iloc[-2], hist_col.iloc[-3]
+        if not (pd.isna(h1) or pd.isna(h2) or pd.isna(h3)):
+            if h1 > h2 > h3: signals.append(("bull","MACD MOMENTUM RISING")); score += 1
+            elif h1 < h2 < h3: signals.append(("bear","MACD MOMENTUM FALLING")); score -= 1
     avg_vol = df["Volume"].rolling(20).mean().iloc[-1]; cur_vol = last["Volume"]
     if avg_vol > 0 and cur_vol > avg_vol * 1.5:
-        signals.append(("bull" if last["Close"] >= last["Open"] else "bear", f"HIGH VOLUME ({cur_vol/avg_vol:.1f}x AVG)"))
+        vol_bull = last["Close"] >= last["Open"]
+        signals.append(("bull" if vol_bull else "bear", f"HIGH VOLUME ({cur_vol/avg_vol:.1f}x AVG)"))
+        score += 1 if vol_bull else -1
     if not pd.isna(last["BB_Upper"]):
         if price >= last["BB_Upper"]: signals.append(("bear","AT UPPER BB")); score -= 1
         elif price <= last["BB_Lower"]: signals.append(("bull","AT LOWER BB")); score += 1
@@ -248,9 +257,16 @@ def evaluate_signals(df, info):
 def generate_verdict(score, df):
     price = df["Close"].iloc[-1]; atr = df["ATR"].iloc[-1]
     if pd.isna(atr) or atr == 0: atr = price * 0.02
-    if score >= 4: action,color,bias,stop,target = "BUY / LONG","#00f5d4","Bullish",price-atr*2,price+atr*4
-    elif score <= -3: action,color,bias,stop,target = "AVOID / SHORT BIAS","#ff6b6b","Bearish",price+atr*2,price-atr*4
-    else: action,color,bias,stop,target = "WAIT / NEUTRAL","#f5a623","Neutral",price-atr*1.5,price+atr*3
+    floor = price * 0.01
+    if score >= 4:
+        action, color, bias = "BUY / LONG", "#00f5d4", "Bullish"
+        stop, target = max(floor, price - atr * 2), price + atr * 4
+    elif score <= -4:
+        action, color, bias = "AVOID / SHORT BIAS", "#ff6b6b", "Bearish"
+        stop, target = price + atr * 2, max(floor, price - atr * 4)
+    else:
+        action, color, bias = "WAIT / NEUTRAL", "#f5a623", "Neutral"
+        stop, target = max(floor, price - atr * 1.5), price + atr * 3
     rr = round(abs(target-price)/abs(price-stop), 2) if abs(price-stop) > 0 else 0
     return {"action":action,"color":color,"bias":bias,"score":score,"stop":stop,"target":target,"atr":atr,"rr":rr}
 
@@ -405,7 +421,7 @@ if analyze_btn and ticker_input:
     _section_header(f"⚡ TRADER'S VERDICT — {ticker}")
     v = generate_verdict(score, hist)
     vc1,vc2,vc3,vc4 = st.columns(4)
-    vc1.metric("ACTION",v["action"]); vc2.metric("SIGNAL SCORE",f"{v['score']:+d} / 10"); vc3.metric("STOP LOSS",p(v["stop"])); vc4.metric("TARGET",p(v["target"]))
+    vc1.metric("ACTION",v["action"]); vc2.metric("SIGNAL SCORE",f"{v['score']:+d} / 9"); vc3.metric("STOP LOSS",p(v["stop"])); vc4.metric("TARGET",p(v["target"]))
     atr_str = esc(f"{ccy}{v['atr']:,.0f}" if is_idr else f"{ccy}{v['atr']:.2f}")
     st.markdown(f"<div class='verdict-box'><span style='font-family:Bebas Neue,sans-serif;font-size:22px;color:{v['color']}'>{v['action']}</span><span style='font-size:12px;color:#666;margin-left:14px'>Score: {v['score']:+d} | R:R = 1:{v['rr']} | ATR = {atr_str}</span><br><br><span style='font-size:12px;color:#aaa;line-height:1.8'>&#128205; <b>Entry:</b> {esc(p(price))} &nbsp; &#128721; <b>Stop:</b> {esc(p(v['stop']))} &nbsp; &#127919; <b>Target:</b> {esc(p(v['target']))}<br>Bias is <b style='color:{v['color']}'>{v['bias']}</b> based on {len(signals)} active signals</span></div>", unsafe_allow_html=True)
 
