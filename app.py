@@ -14,6 +14,7 @@ _FAST_INFO_MAP = (
     ("fiftyTwoWeekLow",    "year_low"),
     ("averageVolume",      "three_month_average_volume"),
     ("currency",           "currency"),
+    ("lastPrice",          "last_price"),
 )
 
 st.set_page_config(page_title="Rocky Signal — Stock Intelligence", page_icon="📡", layout="wide", initial_sidebar_state="collapsed")
@@ -302,7 +303,9 @@ if analyze_btn and ticker_input:
 
     hist = compute_indicators(hist)
     last = hist.iloc[-1]; prev = hist.iloc[-2]
-    price = last["Close"]; change = price - prev["Close"]; pct_chg = (change / prev["Close"]) * 100
+    price = (info.get("currentPrice") or info.get("regularMarketPrice")
+             or info.get("lastPrice") or float(last["Close"]))
+    change = price - float(prev["Close"]); pct_chg = (change / float(prev["Close"])) * 100
 
     # Fall back to hist-derived values when info is sparse (common for IDX/indices)
     _52w_high = info.get("fiftyTwoWeekHigh") or hist["High"].max()
