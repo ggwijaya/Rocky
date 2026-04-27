@@ -173,7 +173,8 @@ def fetch_data(ticker, period):
             pass
 
     # 2. Authenticated quoteSummary retry — equities only (crypto/indices never have PE/EPS)
-    if _is_equity and not info.get("trailingPE"):
+    _key_funds = ("trailingPE", "forwardPE", "priceToBook", "profitMargins", "trailingEps")
+    if _is_equity and not all(info.get(k) for k in _key_funds):
         try:
             _yfdata = getattr(t, '_data', None)
             if _yfdata:
@@ -187,8 +188,8 @@ def fetch_data(ticker, period):
                             if isinstance(mod, dict):
                                 for k, v in mod.items():
                                     val = v.get("raw") if isinstance(v, dict) and "raw" in v else (None if isinstance(v, dict) else v)
-                                    if val is not None:
-                                        info.setdefault(k, val)
+                                    if val is not None and not info.get(k):
+                                        info[k] = val
         except Exception:
             pass
 
