@@ -175,23 +175,49 @@ def fetch_data(ticker, period):
     # 2. Authenticated quoteSummary retry — equities only (crypto/indices never have PE/EPS)
     _key_funds = ("trailingPE", "forwardPE", "priceToBook", "profitMargins", "trailingEps")
     if _is_equity and not all(info.get(k) for k in _key_funds):
+        _qs = None
+        # 2a. Preferred: yfinance's internal _fetch handles crumb auth + full params
         try:
-            _yfdata = getattr(t, '_data', None)
-            if _yfdata:
-                _get = getattr(_yfdata, 'get_raw_json', None)
-                if _get:
-                    url = f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}"
-                    raw = _get(url, params={"modules": "defaultKeyStatistics,summaryDetail,financialData", "formatted": "false"})
-                    result = (raw or {}).get("quoteSummary", {}).get("result") or []
-                    if result:
-                        for mod in result[0].values():
-                            if isinstance(mod, dict):
-                                for k, v in mod.items():
-                                    val = v.get("raw") if isinstance(v, dict) and "raw" in v else (None if isinstance(v, dict) else v)
-                                    if val is not None and not info.get(k):
-                                        info[k] = val
+            _q = getattr(t, "_quote", None)
+            if _q is not None and hasattr(_q, "_fetch"):
+                _qs = _q._fetch(modules=["financialData", "defaultKeyStatistics", "summaryDetail"])
         except Exception:
-            pass
+            _qs = None
+        # 2b. Fallback: direct quoteSummary call with the same params yfinance sends
+        if not _qs:
+            try:
+                _yfdata = getattr(t, "_data", None)
+                _get = getattr(_yfdata, "get_raw_json", None) if _yfdata else None
+                if _get:
+                    _qs = _get(
+                        f"https://query2.finance.yahoo.com/v10/finance/quoteSummary/{ticker}",
+                        params={
+                            "modules": "defaultKeyStatistics,summaryDetail,financialData",
+                            "corsDomain": "finance.yahoo.com",
+                            "formatted": "false",
+                            "symbol": ticker,
+                        },
+                    )
+            except Exception:
+                _qs = None
+        # 2c. Parse and merge — guard against null .result (yfinance 1.x edge case)
+        if isinstance(_qs, dict):
+            try:
+                for _qk in ("quoteSummary", "quoteResponse"):
+                    _box = _qs.get(_qk) or {}
+                    _entries = _box.get("result") or []
+                    for _entry in _entries:
+                        if not isinstance(_entry, dict):
+                            continue
+                        for _mod in _entry.values():
+                            if not isinstance(_mod, dict):
+                                continue
+                            for k, v in _mod.items():
+                                val = v.get("raw") if isinstance(v, dict) and "raw" in v else (None if isinstance(v, dict) else v)
+                                if val is not None and not info.get(k):
+                                    info[k] = val
+            except Exception:
+                pass
 
     # 3. fast_info — chart API, always reliable for price/market metrics
     try:
