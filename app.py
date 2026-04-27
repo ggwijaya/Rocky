@@ -82,6 +82,23 @@ def calc_bb(s, period=20, std=2):
 def calc_atr(h, l, c, period=14):
     tr = pd.concat([h-l, (h-c.shift()).abs(), (l-c.shift()).abs()], axis=1).max(axis=1)
     return tr.ewm(com=period-1, min_periods=period).mean()
+def calc_sr(df, lookback=60):
+    if len(df) < 5: return None, None
+    recent = df.tail(lookback)
+    highs = recent["High"].values; lows = recent["Low"].values
+    price = float(df["Close"].iloc[-1])
+    p_highs, p_lows = [], []
+    for i in range(2, len(recent) - 2):
+        if highs[i] > highs[i-1] and highs[i] > highs[i-2] and highs[i] > highs[i+1] and highs[i] > highs[i+2]:
+            p_highs.append(float(highs[i]))
+        if lows[i] < lows[i-1] and lows[i] < lows[i-2] and lows[i] < lows[i+1] and lows[i] < lows[i+2]:
+            p_lows.append(float(lows[i]))
+    res_above = [h for h in p_highs if h > price]
+    sup_below = [l for l in p_lows if l < price]
+    period_high = float(recent["High"].max()); period_low = float(recent["Low"].min())
+    resistance = min(res_above) if res_above else (period_high if period_high > price else None)
+    support = max(sup_below) if sup_below else (period_low if period_low < price else None)
+    return support, resistance
 
 def compute_indicators(df):
     df = df.copy()
@@ -269,7 +286,8 @@ def generate_verdict(score, df):
         action, color, bias = "WAIT / NEUTRAL", "#f5a623", "Neutral"
         stop, target = max(floor, price - atr * 1.5), price + atr * 3
     rr = round(abs(target-price)/abs(price-stop), 2) if abs(price-stop) > 0 else 0
-    return {"action":action,"color":color,"bias":bias,"score":score,"stop":stop,"target":target,"atr":atr,"rr":rr}
+    support, resistance = calc_sr(df)
+    return {"action":action,"color":color,"bias":bias,"score":score,"stop":stop,"target":target,"atr":atr,"rr":rr,"support":support,"resistance":resistance}
 
 def _section_header(title: str) -> None:
     st.markdown(f'<div class="section-header">{title}</div>', unsafe_allow_html=True)
@@ -426,7 +444,9 @@ if analyze_btn and ticker_input:
     vc1,vc2,vc3,vc4 = st.columns(4)
     vc1.metric("ACTION",v["action"]); vc2.metric("SIGNAL SCORE",f"{v['score']:+d} / 9"); vc3.metric("STOP LOSS",p(v["stop"])); vc4.metric("TARGET",p(v["target"]))
     atr_str = esc(f"{ccy}{v['atr']:,.0f}" if is_idr else f"{ccy}{v['atr']:.2f}")
-    st.markdown(f"<div class='verdict-box'><span style='font-family:Bebas Neue,sans-serif;font-size:22px;color:{v['color']}'>{v['action']}</span><span style='font-size:12px;color:#666;margin-left:14px'>Score: {v['score']:+d} | R:R = 1:{v['rr']} | ATR = {atr_str}</span><br><br><span style='font-size:12px;color:#aaa;line-height:1.8'>&#128205; <b>Entry:</b> {esc(p(price))} &nbsp; &#128721; <b>Stop:</b> {esc(p(v['stop']))} &nbsp; &#127919; <b>Target:</b> {esc(p(v['target']))}<br>Bias is <b style='color:{v['color']}'>{v['bias']}</b> based on {len(signals)} active signals</span></div>", unsafe_allow_html=True)
+    sup_str = esc(p(v["support"])) if v["support"] is not None else "N/A"
+    res_str = esc(p(v["resistance"])) if v["resistance"] is not None else "N/A"
+    st.markdown(f"<div class='verdict-box'><span style='font-family:Bebas Neue,sans-serif;font-size:22px;color:{v['color']}'>{v['action']}</span><span style='font-size:12px;color:#666;margin-left:14px'>Score: {v['score']:+d} | R:R = 1:{v['rr']} | ATR = {atr_str}</span><br><br><span style='font-size:12px;color:#aaa;line-height:1.8'>&#128205; <b>Entry:</b> {esc(p(price))} &nbsp; &#128721; <b>Stop:</b> {esc(p(v['stop']))} &nbsp; &#127919; <b>Target:</b> {esc(p(v['target']))}<br>&#128317; <b>Support:</b> {sup_str} &nbsp; &#128316; <b>Resistance:</b> {res_str}<br>Bias is <b style='color:{v['color']}'>{v['bias']}</b> based on {len(signals)} active signals</span></div>", unsafe_allow_html=True)
 
     if info.get("longBusinessSummary"):
         with st.expander("🏢 COMPANY OVERVIEW"):
