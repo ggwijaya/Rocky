@@ -38,6 +38,7 @@ div[data-testid="stMetricLabel"] { font-size: 11px !important; letter-spacing: 0
 .stTextInput>div>div>input { background: rgba(255,255,255,0.04) !important; border: 1px solid rgba(255,255,255,0.12) !important; border-radius: 8px !important; color: #fff !important; font-family: 'IBM Plex Mono', monospace !important; font-size: 15px !important; letter-spacing: 0.1em !important; }
 .stTextInput>div>div>input:focus { border-color: #00f5d4 !important; box-shadow: 0 0 0 2px rgba(0,245,212,0.25) !important; outline: none !important; }
 .stTextInput>div:focus-within { border-color: transparent !important; box-shadow: none !important; }
+.stSelectbox > div > div:focus-within { border-color: #00f5d4 !important; box-shadow: 0 0 0 2px rgba(0,245,212,0.25) !important; }
 div[data-testid="InputInstructions"] { display: none !important; }
 footer { visibility: hidden; } #MainMenu { visibility: hidden; } header[data-testid="stHeader"] { display: none !important; }
 .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 8px 0 16px; }
