@@ -115,12 +115,12 @@ def compute_indicators(df):
 def fmt(val, decimals=2, prefix="", suffix=""):
     if val is None or (isinstance(val, float) and pd.isna(val)): return "N/A"
     return f"{prefix}{val:,.{decimals}f}{suffix}"
-def fmt_large(val):
+def fmt_large(val, prefix="$"):
     if val is None or (isinstance(val, float) and pd.isna(val)): return "N/A"
-    if val >= 1e12: return f"${val/1e12:.2f}T"
-    if val >= 1e9: return f"${val/1e9:.2f}B"
-    if val >= 1e6: return f"${val/1e6:.2f}M"
-    return f"${val:,.0f}"
+    if val >= 1e12: return f"{prefix}{val/1e12:.2f}T"
+    if val >= 1e9:  return f"{prefix}{val/1e9:.2f}B"
+    if val >= 1e6:  return f"{prefix}{val/1e6:.2f}M"
+    return f"{prefix}{val:,.0f}"
 def signal_tag(label, direction):
     cls = {"bull":"tag-bull","bear":"tag-bear","neut":"tag-neut"}.get(direction,"tag-neut")
     return f'<span class="tag {cls}">{label}</span>'
@@ -148,7 +148,12 @@ def fetch_data(ticker, period):
             raw = t.info
             return raw if isinstance(raw, dict) else {}
         except Exception:
-            return {}
+            try:
+                _q = getattr(t, "_quote", None)
+                partial = getattr(_q, "_info", None) if _q else None
+                return partial if isinstance(partial, dict) else {}
+            except Exception:
+                return {}
 
     def _fetch_divs():
         try:
@@ -248,10 +253,11 @@ def build_chart(df):
     fig = make_subplots(rows=3, cols=1, shared_xaxes=True, row_heights=[0.55,0.25,0.20], vertical_spacing=0.03)
     fig.add_trace(go.Candlestick(x=df.index, open=df["Open"], high=df["High"], low=df["Low"], close=df["Close"], increasing_line_color="#00f5d4", decreasing_line_color="#ff6b6b", name="Price"), row=1, col=1)
     for col, color, name in [("EMA_20","#f5a623","EMA 20"),("EMA_50","#c77dff","EMA 50"),("EMA_200","#ff6b6b","EMA 200")]:
-        fig.add_trace(go.Scatter(x=df.index, y=df[col], name=name, line=dict(color=color, width=1.2)), row=1, col=1)
+        if df[col].notna().any():
+            fig.add_trace(go.Scatter(x=df.index, y=df[col], name=name, line=dict(color=color, width=1.2)), row=1, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df["BB_Upper"], line=dict(color="rgba(255,255,255,0.09)", width=1, dash="dot"), showlegend=False), row=1, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df["BB_Lower"], line=dict(color="rgba(255,255,255,0.09)", width=1, dash="dot"), fill="tonexty", fillcolor="rgba(255,255,255,0.02)", showlegend=False), row=1, col=1)
-    colors = ["#00f5d4" if c >= o else "#ff6b6b" for c,o in zip(df["Close"], df["Open"])]
+    colors = np.where(df["Close"] >= df["Open"], "#00f5d4", "#ff6b6b").tolist()
     fig.add_trace(go.Bar(x=df.index, y=df["Volume"], marker_color=colors, opacity=0.7, showlegend=False), row=2, col=1)
     fig.add_trace(go.Scatter(x=df.index, y=df["RSI"], line=dict(color="#c77dff", width=1.5), showlegend=False), row=3, col=1)
     fig.add_hline(y=70, line_dash="dot", line_color="rgba(255,107,107,0.31)", row=3, col=1)
@@ -300,8 +306,9 @@ def evaluate_signals(df, info):
         elif price <= last["BB_Lower"]: signals.append(("bull","AT LOWER BB")); score += 1
     return signals, score
 
-def generate_verdict(score, df):
-    price = df["Close"].iloc[-1]; atr = df["ATR"].iloc[-1]
+def generate_verdict(score, df, live_price=None):
+    price = float(live_price) if live_price is not None else float(df["Close"].iloc[-1])
+    atr = df["ATR"].iloc[-1]
     if pd.isna(atr) or atr == 0: atr = price * 0.02
     floor = price * 0.01
     if score >= 4:
@@ -348,10 +355,12 @@ if analyze_btn and ticker_input:
     if hist.empty or len(hist) < 10: st.error("No data. Check ticker symbol."); st.stop()
 
     hist = compute_indicators(hist)
-    last = hist.iloc[-1]; prev = hist.iloc[-2]
+    last = hist.iloc[-1]
     price = (info.get("currentPrice") or info.get("regularMarketPrice")
              or info.get("lastPrice") or float(last["Close"]))
-    change = price - float(prev["Close"]); pct_chg = (change / float(prev["Close"])) * 100
+    prev_close = (info.get("previousClose") or info.get("regularMarketPreviousClose")
+                  or float(hist.iloc[-2]["Close"]))
+    change = price - prev_close; pct_chg = (change / prev_close) * 100
 
     # Fall back to hist-derived values when info is sparse (common for IDX/indices)
     _52w_high = info.get("fiftyTwoWeekHigh") or hist["High"].max()
@@ -377,7 +386,9 @@ if analyze_btn and ticker_input:
             if val>=1e9: return f"{s}{val/1e9:.2f}B"
             if val>=1e6: return f"{s}{val/1e6:.2f}M"
             return f"{s}{val:,.0f}"
-    def pct(v): return fmt(v*100 if v else None, suffix="%") if v else "N/A"
+    def pct(v):
+        if v is None or (isinstance(v, float) and pd.isna(v)): return "N/A"
+        return fmt(v * 100, suffix="%")
     def esc(s): return s.replace('$', '&#36;')  # prevent Streamlit LaTeX parsing of $
 
     badge = '<span style="background:rgba(255,214,10,0.1);border:1px solid #ffd60a30;border-radius:4px;padding:2px 8px;font-size:10px;color:#ffd60a">IDX · INDONESIA</span>' if is_idr else ""
@@ -439,7 +450,7 @@ if analyze_btn and ticker_input:
 </script>
 """, unsafe_allow_html=True)
 
-    mvals = [("MKT CAP",esc(big(info.get("marketCap")))),("52W HIGH",esc(p(_52w_high))),("52W LOW",esc(p(_52w_low))),("AVG VOL",esc(fmt_large(_avg_vol)))]
+    mvals = [("MKT CAP",esc(big(info.get("marketCap")))),("52W HIGH",esc(p(_52w_high))),("52W LOW",esc(p(_52w_low))),("AVG VOL",fmt_large(_avg_vol, prefix=""))]
     st.markdown('<div class="metrics-grid">'+''.join(f'<div class="metric-tile"><div class="m-label">{lbl}</div><div class="m-value">{val}</div></div>' for lbl,val in mvals)+'</div>', unsafe_allow_html=True)
 
     _section_header("📈 PRICE CHART + INDICATORS")
@@ -460,7 +471,9 @@ if analyze_btn and ticker_input:
             _eps = info.get("trailingEps")
             if _eps and _eps != 0 and price:
                 _pe = fmt(price / _eps, 2)
-        fund_rows = [("P/E RATIO",_pe),("FWD P/E",fmt(info.get("forwardPE"),2)),("PEG RATIO",fmt(info.get("pegRatio"),2)),("P/S RATIO",fmt(info.get("priceToSalesTrailing12Months"),2)),("P/B RATIO",fmt(info.get("priceToBook"),2)),("EPS (TTM)",p(info.get("trailingEps"))),("FWD EPS",p(info.get("forwardEps"))),("REV GROWTH",pct(info.get("revenueGrowth"))),("PROFIT MARGIN",pct(info.get("profitMargins"))),("DEBT/EQUITY",fmt(info.get("debtToEquity"),2)),("DIVIDEND %",pct(info.get("dividendYield"))),("SHORT FLOAT",pct(info.get("shortPercentOfFloat")))]
+        _de = info.get("debtToEquity")
+        _de_str = fmt(_de / 100, 2) if _de is not None and not (isinstance(_de, float) and pd.isna(_de)) else "N/A"
+        fund_rows = [("P/E RATIO",_pe),("FWD P/E",fmt(info.get("forwardPE"),2)),("PEG RATIO",fmt(info.get("pegRatio"),2)),("P/S RATIO",fmt(info.get("priceToSalesTrailing12Months"),2)),("P/B RATIO",fmt(info.get("priceToBook"),2)),("EPS (TTM)",p(info.get("trailingEps"))),("FWD EPS",p(info.get("forwardEps"))),("REV GROWTH",pct(info.get("revenueGrowth"))),("PROFIT MARGIN",pct(info.get("profitMargins"))),("DEBT/EQUITY",_de_str),("DIVIDEND %",pct(info.get("dividendYield"))),("SHORT FLOAT",pct(info.get("shortPercentOfFloat")))]
         visible = [(k, v) for k, v in fund_rows if v != "N/A"]
         if visible:
             _table(visible, ["Metric","Value"], height=min(460, 45+36*len(visible)))
@@ -468,7 +481,7 @@ if analyze_btn and ticker_input:
             st.markdown('<div style="font-size:11px;color:#444;padding:40px 0;text-align:center;line-height:2">Fundamental data not available<br>for this ticker via Yahoo Finance.</div>', unsafe_allow_html=True)
 
     _section_header(f"⚡ TRADER'S VERDICT — {ticker}")
-    v = generate_verdict(score, hist)
+    v = generate_verdict(score, hist, price)
     vc1,vc2,vc3,vc4 = st.columns(4)
     vc1.metric("ACTION",v["action"]); vc2.metric("SIGNAL SCORE",f"{v['score']:+d} / 9"); vc3.metric("STOP LOSS",p(v["stop"])); vc4.metric("TARGET",p(v["target"]))
     atr_str = esc(f"{ccy}{v['atr']:,.0f}" if is_idr else f"{ccy}{v['atr']:.2f}")
