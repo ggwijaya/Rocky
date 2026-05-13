@@ -133,7 +133,7 @@ def fetch_data(ticker, period):
                   ticker.split('-')[-1].upper() in {'USD','BTC','ETH','EUR','GBP','JPY','USDT','USDC','AUD','CAD','CHF'})
     _is_equity = not _is_index and not _is_crypto
 
-    # ── Tier 1: parallel I/O ──────────────────────────────────────────────────
+    # ── Tier 1: parallel I/O ────────────────────────────────────────────────
     def _fetch_hist():
         try:
             h = t.history(period=period, interval="1d")
@@ -348,7 +348,15 @@ with st.form("ticker_form"):
 st.markdown("---")
 
 if analyze_btn and ticker_input:
-    ticker = ticker_input.strip().upper()
+    st.session_state.rocky_ticker = ticker_input.strip().upper()
+    st.session_state.rocky_period = period
+
+_active_ticker = st.session_state.get("rocky_ticker")
+_active_period = st.session_state.get("rocky_period")
+
+if _active_ticker and _active_period:
+    ticker = _active_ticker
+    period = _active_period
     # Reject input with spaces or commas (multiple tickers)
     if any(c in ticker for c in (' ', ',', ';', '\t')):
         st.error("Enter one ticker at a time — e.g. AAPL, BTC-USD, BBCA.JK"); st.stop()
@@ -507,5 +515,5 @@ if analyze_btn and ticker_input:
 
     st.markdown('<br><div style="font-size:10px;color:#222;text-align:center">ROCKY SIGNAL TERMINAL — DATA VIA YAHOO FINANCE — NOT FINANCIAL ADVICE</div>', unsafe_allow_html=True)
 
-elif not ticker_input:
+else:
     st.markdown("<div style='text-align:center;padding:60px 0'><div style='font-size:52px;margin-bottom:16px'>📡</div><div style='font-family:Bebas Neue,sans-serif;font-size:20px;letter-spacing:0.2em;color:#1e1e30'>AWAITING TICKER INPUT</div><div style='font-size:11px;color:#151520;margin-top:10px'>AAPL · TSLA · NVDA · BTC-USD · ^JKSE · BBCA.JK · TLKM.JK</div></div>", unsafe_allow_html=True)
