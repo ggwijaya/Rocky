@@ -484,15 +484,22 @@ if analyze_btn and ticker_input:
             st.markdown('<div style="font-size:11px;color:#444;padding:40px 0;text-align:center;line-height:2">Fundamental data not available<br>for this ticker via Yahoo Finance.</div>', unsafe_allow_html=True)
 
     _section_header(f"⚡ TRADER'S VERDICT — {ticker}")
-    v = generate_verdict(score, hist, price)
+    _ep_col, _ = st.columns([1, 3])
+    with _ep_col:
+        _entry_input = st.number_input("Entry / Avg Price", min_value=0.0, value=0.0, step=0.01,
+                                        help="Enter your buy price or average cost. Leave 0 to use the live market price.",
+                                        key=f"entry_{ticker}", format="%.4f")
+    _entry_price = float(_entry_input) if _entry_input > 0 else price
+    v = generate_verdict(score, hist, _entry_price)
     vc1,vc2,vc3,vc4 = st.columns(4)
-    stop_arrow = "↓" if v["stop"] < price else "↑"
-    target_arrow = "↑" if v["target"] > price else "↓"
+    stop_arrow = "↓" if v["stop"] < _entry_price else "↑"
+    target_arrow = "↑" if v["target"] > _entry_price else "↓"
     vc1.metric("ACTION",v["action"]); vc2.metric("SIGNAL SCORE",f"{v['score']:+d} / 9"); vc3.metric(f"STOP LOSS {stop_arrow}",p(v["stop"])); vc4.metric(f"TARGET {target_arrow}",p(v["target"]))
     atr_str = esc(f"{ccy}{v['atr']:,.0f}" if is_idr else f"{ccy}{v['atr']:.2f}")
     sup_str = esc(p(v["support"])) if v["support"] is not None else "N/A"
     res_str = esc(p(v["resistance"])) if v["resistance"] is not None else "N/A"
-    st.markdown(f"<div class='verdict-box'><span style='font-family:Bebas Neue,sans-serif;font-size:22px;color:{v['color']}'>{v['action']}</span><span style='font-size:12px;color:#666;margin-left:14px'>Score: {v['score']:+d} | R:R = 1:{v['rr']} | ATR = {atr_str}</span><br><br><span style='font-size:12px;color:#aaa;line-height:1.8'>&#128205; <b>Entry:</b> {esc(p(price))} &nbsp; &#128721; <b>Stop {stop_arrow}:</b> {esc(p(v['stop']))} &nbsp; &#127919; <b>Target {target_arrow}:</b> {esc(p(v['target']))}<br>&#128317; <b>Support:</b> {sup_str} &nbsp; &#128316; <b>Resistance:</b> {res_str}<br>Bias is <b style='color:{v['color']}'>{v['bias']}</b> based on {len(signals)} active signals</span></div>", unsafe_allow_html=True)
+    _entry_label = f"{esc(p(_entry_price))} <span style='font-size:10px;color:#555'>(custom)</span>" if _entry_input > 0 else esc(p(_entry_price))
+    st.markdown(f"<div class='verdict-box'><span style='font-family:Bebas Neue,sans-serif;font-size:22px;color:{v['color']}'>{v['action']}</span><span style='font-size:12px;color:#666;margin-left:14px'>Score: {v['score']:+d} | R:R = 1:{v['rr']} | ATR = {atr_str}</span><br><br><span style='font-size:12px;color:#aaa;line-height:1.8'>&#128205; <b>Entry:</b> {_entry_label} &nbsp; &#128721; <b>Stop {stop_arrow}:</b> {esc(p(v['stop']))} &nbsp; &#127919; <b>Target {target_arrow}:</b> {esc(p(v['target']))}<br>&#128317; <b>Support:</b> {sup_str} &nbsp; &#128316; <b>Resistance:</b> {res_str}<br>Bias is <b style='color:{v['color']}'>{v['bias']}</b> based on {len(signals)} active signals</span></div>", unsafe_allow_html=True)
 
     if info.get("longBusinessSummary"):
         with st.expander("🏢 COMPANY OVERVIEW"):
